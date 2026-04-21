@@ -30,7 +30,7 @@ uint32_t _sd_uR7_CMD=0;
 uint8_t *_sd_pSDHCBuffer;
 uint32_t _sd_ReferenceClock;
 
-__align(4096) uint8_t _sd_ucSDHCBuffer[64];
+__align(4096) uint8_t _sd_ucSDHCBuffer[512];
 
 void SD_CheckRB()
 {
@@ -49,7 +49,11 @@ int SD_SDCommand(struct FMI_SD_INFO *pSD, uint8_t ucCmd, uint32_t uArg)
     outpw(REG_NAND_SDARG, uArg);
     outpw(REG_NAND_SDCSR, (inpw(REG_NAND_SDCSR)&(~SD_CSR_CMD_MASK))|(ucCmd << 8)|(SD_CSR_CO_EN));
 
-    while(inpw(REG_NAND_SDCSR) & SD_CSR_CO_EN);
+    while(inpw(REG_NAND_SDCSR) & SD_CSR_CO_EN) {
+        if (pSD->bIsCardInsert == false)
+            return SD_NO_SD_CARD;
+    }
+
     return Successful;
 }
 
@@ -143,9 +147,14 @@ int SD_SDCmdAndRspDataIn(struct FMI_SD_INFO *pSD, uint8_t ucCmd, uint32_t uArg)
     outpw(REG_NAND_SDARG, uArg);
     outpw(REG_NAND_SDCSR, (inpw(REG_NAND_SDCSR)&(~SD_CSR_CMD_MASK))|(ucCmd << 8)|(SD_CSR_CO_EN | SD_CSR_RI_EN | SD_CSR_DI_EN));
 
-    while (inpw(REG_NAND_SDCSR) & SD_CSR_RI_EN);
-
-    while (inpw(REG_NAND_SDCSR) & SD_CSR_DI_EN);
+    while (inpw(REG_NAND_SDCSR) & SD_CSR_RI_EN) {
+        if (pSD->bIsCardInsert == false)
+            return SD_NO_SD_CARD;
+    }
+    while (inpw(REG_NAND_SDCSR) & SD_CSR_DI_EN) {
+        if (pSD->bIsCardInsert == false)
+            return SD_NO_SD_CARD;
+    }
 
     if (!(inpw(REG_NAND_SDISR) & SD_ISR_CRC7_OK)) {     // check CRC7
         return SD_CRC7_ERROR;
@@ -216,12 +225,16 @@ int SD_Init(struct FMI_SD_INFO *pSD)
     unsigned int CIDBuffer[4];
     unsigned int volatile u32CmdTimeOut;
 
-    // set the clock to 200KHz
+    // set the clock to 300KHz
     SD_Set_clock(300);
     //SD_Set_clock(50);
     // power ON 74 clock
     outpw(REG_NAND_SDCSR, inpw(REG_NAND_SDCSR) | SD_CSR_CLK74_OE);
-    while(inpw(REG_NAND_SDCSR) & SD_CSR_CLK74_OE);
+    //while(inpw(REG_NAND_SDCSR) & SD_CSR_CLK74_OE);
+    while(inpw(REG_NAND_SDCSR) & SD_CSR_CLK74_OE) {
+        if (pSD->bIsCardInsert == false)
+            return SD_NO_SD_CARD;
+    }
 
     SD_SDCommand(pSD, 0, 0);        // reset all cards
     for (i=0x100; i>0; i--);
@@ -245,7 +258,7 @@ int SD_Init(struct FMI_SD_INFO *pSD)
             SD_SDCmdAndRsp(pSD, 41, 0x40ff8000, u32CmdTimeOut); // 3.0v-3.4v
             resp = inpw(REG_NAND_SDRSP0);
         }
-        if (resp & 0x00400000)
+        if ((resp & 0x00400000ul) == 0x00400000ul)
             pSD->uCardType = SD_TYPE_SD_HIGH;
         else
             pSD->uCardType = SD_TYPE_SD_LOW;
@@ -271,32 +284,22 @@ int SD_Init(struct FMI_SD_INFO *pSD)
                     SD_SDCmdAndRsp(pSD, 1, 0x40ff8080, u32CmdTimeOut);      // high voltage
                     resp = inpw(REG_NAND_SDRSP0);
                 }
-                pSD->uCardType = SD_TYPE_EMMC;
+                //pSD->uCardType = SD_TYPE_EMMC;
+                if ((resp & 0x00400000ul) == 0x00400000ul)
+                    pSD->uCardType = SD_TYPE_EMMC;
+                else
+                    pSD->uCardType = SD_TYPE_MMC;
             }
             else
-            {							  
-                SD_SDCommand(pSD, 0, 0);        // reset
-                for (i=0x100; i>0; i--){;}
-                i=SD_SDCmdAndRsp(pSD, 1, 0x80ff8000, u32CmdTimeOut);
-                MSG_DEBUG("i=SD_SDCmdAndRs i=%d\n",i);
-                if ( i!= 2) // MMC memory
-                {
-                    resp = inpw(REG_NAND_SDRSP0);
-                    while (!(resp & 0x00800000)) {      // check if card is ready
-                        _sd_uR3_CMD = 1;
-                        SD_SDCmdAndRsp(pSD, 1, 0x80ff8000, u32CmdTimeOut);      // high voltage
-                        resp = inpw(REG_NAND_SDRSP0);
-                    }
-                    pSD->uCardType = SD_TYPE_MMC;
-                }else{
-                    pSD->uCardType = SD_TYPE_UNKNOWN;
-                    return SD_ERR_DEVICE;
-                }
+            {
+                pSD->bIsCardInsert = false;
+                pSD->uCardType = SD_TYPE_UNKNOWN;
+                return SD_ERR_DEVICE;
             }
         }
         else if (i == 0)    // SD Memory
         {
-					  int count=10;
+            int count=10;
             _sd_uR3_CMD = 1;
             SD_SDCmdAndRsp(pSD, 41, 0x00ff8000, u32CmdTimeOut); // 3.0v-3.4v
             resp = inpw(REG_NAND_SDRSP0);
@@ -309,10 +312,12 @@ int SD_Init(struct FMI_SD_INFO *pSD)
             }
             if(count<=0) {
                 pSD->uCardType = SD_TYPE_UNKNOWN;
+                pSD->bIsCardInsert = false;
                 return SD_INIT_ERROR;
             }
             pSD->uCardType = SD_TYPE_SD_LOW;
         } else {
+            pSD->bIsCardInsert = false;
             pSD->uCardType = SD_TYPE_UNKNOWN;
             return SD_INIT_ERROR;
         }
@@ -337,16 +342,21 @@ int SD_Init(struct FMI_SD_INFO *pSD)
         }
     }
 
+    SD_Set_clock(24000);
     if (pSD->uCardType == SD_TYPE_SD_HIGH)
         MSG_DEBUG("This is high capacity SD memory card\n");
     if (pSD->uCardType == SD_TYPE_SD_LOW)
         MSG_DEBUG("This is standard capacity SD memory card\n");
-    if (pSD->uCardType == SD_TYPE_MMC)
+    if (pSD->uCardType == SD_TYPE_MMC) {
+        SD_Set_clock(20000);
         MSG_DEBUG("This is MMC memory card\n");
-    if (pSD->uCardType == SD_TYPE_EMMC)
+    }
+    if (pSD->uCardType == SD_TYPE_EMMC) {
+        SD_Set_clock(20000);
         MSG_DEBUG("This is eMMC memory card\n");
+    }
 
-    SD_Set_clock(50000);
+    //SD_Set_clock(50000);
     return Successful;
 }
 
@@ -484,7 +494,11 @@ int SD_Read_in_blksize(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufc
     SD_CheckRB();
 
     outpw(REG_NAND_SDBLEN, blksize - 1);   // the actual byte count is equal to (SDBLEN+1)
-    outpw(REG_NAND_SDARG, uSector);
+
+    if ((pSD->uCardType == SD_TYPE_SD_HIGH) || (pSD->uCardType == SD_TYPE_EMMC))
+        outpw(REG_NAND_SDARG, uSector);
+    else
+        outpw(REG_NAND_SDARG, uSector * blksize);
     outpw(REG_NAND_DMACSAR, uDAddr);
 
     loop = uBufcnt / 255;
@@ -499,22 +513,23 @@ int SD_Read_in_blksize(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufc
         else
             outpw(REG_NAND_SDCSR, reg | SD_CSR_DI_EN);
 
-        while(1)
-        {
-            if (inpw(REG_NAND_SDISR) & SD_ISR_BLKD_IF)
-            {
+        while(1) {
+            if ((inpw(REG_NAND_SDISR) & SD_ISR_BLKD_IF) && (!(inpw(REG_NAND_SDCSR) & SD_CSR_DI_EN))) {
                 outpw(REG_NAND_SDISR, SD_ISR_BLKD_IF);
                 break;
             }
+
+            if (pSD->bIsCardInsert == false)
+                return SD_NO_SD_CARD;
         }
 
         if (!(inpw(REG_NAND_SDISR) & SD_ISR_CRC7_OK)) {     // check CRC7
-            //printf("sdioSD_Read_in_blksize(): response error!\n");
+            MSG_DEBUG("sdioSD_Read_in_blksize(): response error!\n");
             return SD_CRC7_ERROR;
         }
 
         if (!(inpw(REG_NAND_SDISR) & SD_ISR_CRC16_OK)) {    // check CRC16
-            //printf("sdioSD_Read_in_blksize() :read data error!\n");
+            MSG_DEBUG("sdioSD_Read_in_blksize() :read data error!\n");
             return SD_CRC16_ERROR;
         }
     }
@@ -534,28 +549,28 @@ int SD_Read_in_blksize(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufc
         else
             outpw(REG_NAND_SDCSR, reg | SD_CSR_DI_EN);
 
-        while(1)
-        {
-            if (inpw(REG_NAND_SDISR) & SD_ISR_BLKD_IF)
-            {
+        while(1) {
+            if ((inpw(REG_NAND_SDISR) & SD_ISR_BLKD_IF) && (!(inpw(REG_NAND_SDCSR) & SD_CSR_DI_EN))) {
                 outpw(REG_NAND_SDISR, SD_ISR_BLKD_IF);
                 break;
             }
+            if (pSD->bIsCardInsert == false)
+                return SD_NO_SD_CARD;
         }
 
         if (!(inpw(REG_NAND_SDISR) & SD_ISR_CRC7_OK)) {     // check CRC7
-            //printf("sdioSD_Read_in_blksize(): response error!\n");
+            MSG_DEBUG("sdioSD_Read_in_blksize(): response error!\n");
             return SD_CRC7_ERROR;
         }
 
         if (!(inpw(REG_NAND_SDISR) & SD_ISR_CRC16_OK)) {    // check CRC16
-            //printf("sdioSD_Read_in_blksize(): read data error!\n");
+            MSG_DEBUG("sdioSD_Read_in_blksize(): read data error!\n");
             return SD_CRC16_ERROR;
         }
     }
 
     if (SD_SDCmdAndRsp(pSD, 12, 0, 0)) {    // stop command
-        //printf("stop command fail !!\n");
+        MSG_DEBUG("stop command fail !!\n");
         return SD_CRC7_ERROR;
     }
     SD_CheckRB();
@@ -596,13 +611,12 @@ int SD_Write_in(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufcnt, uin
     // According to SD Spec v2.0, the write CMD block size MUST be 512, and the start address MUST be 512*n.
     outpw(REG_NAND_SDBLEN, SD_BLOCK_SIZE - 1);           // set the block size
 
-    //outpw(REG_NAND_SDARG, uSector);
     if ((pSD->uCardType == SD_TYPE_SD_HIGH) || (pSD->uCardType == SD_TYPE_EMMC))
         outpw(REG_NAND_SDARG, uSector);
     else
         outpw(REG_NAND_SDARG, uSector * SD_BLOCK_SIZE);  // set start address for SD CMD
-    //MSG_DEBUG("SD_Write_in %x(%d), %x(%d)", uSector, uSector, SD_BLOCK_SIZE, SD_BLOCK_SIZE);
-    for(i=0; i<2000; i++);
+
+    //for(i=0; i<2000; i++);
     outpw(REG_NAND_DMACSAR, uSAddr);
     loop = uBufcnt / 255;
     for (i=0; i<loop; i++)
@@ -616,13 +630,13 @@ int SD_Write_in(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufcnt, uin
         else
             outpw(REG_NAND_SDCSR, reg | SD_CSR_DO_EN);
 
-        while(1)
-        {
-            if (inpw(REG_NAND_SDISR) & SD_ISR_BLKD_IF)
-            {
+        while(1) {
+            if ((inpw(REG_NAND_SDISR) & SD_ISR_BLKD_IF) && (!(inpw(REG_NAND_SDCSR) & SD_CSR_DO_EN))) {
                 outpw(REG_NAND_SDISR, SD_ISR_BLKD_IF);
                 break;
             }
+            if (pSD->bIsCardInsert == false)
+                return SD_NO_SD_CARD;
         }
 
         if ((inpw(REG_NAND_SDISR) & SD_ISR_CRC_IF) != 0) {      // check CRC
@@ -630,7 +644,7 @@ int SD_Write_in(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufcnt, uin
             return SD_CRC_ERROR;
         }
     }
-    for(i=0; i<2000; i++);
+    //for(i=0; i<2000; i++);
     loop = uBufcnt % 255;
     if (loop != 0)
     {
@@ -643,13 +657,13 @@ int SD_Write_in(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufcnt, uin
         else
             outpw(REG_NAND_SDCSR, reg | SD_CSR_DO_EN);
 
-        while(1)
-        {
-            if (inpw(REG_NAND_SDISR) & SD_ISR_BLKD_IF)
-            {
+        while(1) {
+            if ((inpw(REG_NAND_SDISR) & SD_ISR_BLKD_IF) && (!(inpw(REG_NAND_SDCSR) & SD_CSR_DO_EN))) {
                 outpw(REG_NAND_SDISR, SD_ISR_BLKD_IF);
                 break;
             }
+            if (pSD->bIsCardInsert == false)
+                return SD_NO_SD_CARD;
         }
 
         if ((inpw(REG_NAND_SDISR) & SD_ISR_CRC_IF) != 0) {      // check CRC
@@ -658,14 +672,14 @@ int SD_Write_in(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufcnt, uin
         }
     }
     outpw(REG_NAND_SDISR, SD_ISR_CRC_IF);
-    for(i=0; i<2000; i++);
+    //for(i=0; i<2000; i++);
     if (SD_SDCmdAndRsp(pSD, 12, 0, 0))      // stop command
     {
         return SD_CRC7_ERROR;
     }
     SD_CheckRB();
 
-    for(i=0; i<2000; i++);
+    //for(i=0; i<2000; i++);
     SD_SDCommand(pSD, 7, 0);
 
     return Successful;
@@ -681,23 +695,63 @@ void SD_Get_SD_info(struct FMI_SD_INFO *pSD, struct DISK_DATA *_info)
 
     SD_SDCmdAndRsp2(pSD, 9, pSD->uRCA, Buffer);
 
-    if ((Buffer[0] & 0xc0000000) && (pSD->uCardType != SD_TYPE_MMC) && (pSD->uCardType != SD_TYPE_EMMC))
+    if ((pSD->uCardType == SD_TYPE_MMC) || (pSD->uCardType == SD_TYPE_EMMC))
     {
-        C_Size = ((Buffer[1] & 0x0000003f) << 16) | ((Buffer[2] & 0xffff0000) >> 16);
-        size = (C_Size+1) * 512;// Kbytes
+        /* for MMC/eMMC card */
+        if ((Buffer[0] & 0xc0000000) == 0xc0000000)
+        {
+            /* CSD_STRUCTURE [127:126] is 3 */
+            /* CSD version depend on EXT_CSD register in eMMC v4.4 for card size > 2GB */
+            SD_SDCmdAndRsp(pSD, 7ul, pSD->uRCA, 0ul);
 
-        _info->diskSize = size;
-        _info->totalSectorN = size << 1;
+            ptr = (unsigned char *)((unsigned int)_sd_ucSDHCBuffer);
+            outpw(REG_NAND_DMACSAR, (unsigned int)ptr); // set DMA transfer starting address
+            outpw(REG_NAND_SDBLEN, 511); // read 512 bytes for EXT_CSD
+
+            if (SD_SDCmdAndRspDataIn(pSD, 8ul, 0x00ul) == Successful)
+            {
+                SD_SDCommand(pSD, 7ul, 0ul);
+                outpw(REG_NAND_SDCSR, inpw(REG_NAND_SDCSR) | SD_CSR_CLK8_OE);
+                while ( (inpw(REG_NAND_SDCSR) & SD_CSR_CLK8_OE) == SD_CSR_CLK8_OE)
+                {
+                }
+
+                _info->totalSectorN = (*(unsigned int *)(ptr + 212));
+                _info->diskSize = _info->totalSectorN / 2ul;
+            }
+        }
+        else
+        {
+            /* CSD version v1.0/1.1/1.2 in eMMC v4.4 spec for card size <= 2GB */
+            R_LEN = (Buffer[1] & 0x000f0000ul) >> 16;
+            C_Size = ((Buffer[1] & 0x000003fful) << 2) | ((Buffer[2] & 0xc0000000ul) >> 30);
+            MULT = (Buffer[2] & 0x00038000ul) >> 15;
+            size = (C_Size+1ul) * (1ul<<(MULT+2ul)) * (1ul<<R_LEN);
+
+            _info->diskSize = size / 1024ul;
+            _info->totalSectorN = size / 512ul;
+        }
     }
     else
     {
-        R_LEN = (Buffer[1] & 0x000f0000) >> 16;
-        C_Size = ((Buffer[1] & 0x000003ff) << 2) | ((Buffer[2] & 0xc0000000) >> 30);
-        MULT = (Buffer[2] & 0x00038000) >> 15;
-        size = (C_Size + 1) * (1 << (MULT + 2)) * (1 << R_LEN);
+        if ((Buffer[0] & 0xc0000000) != 0x0ul)
+        {
+            C_Size = ((Buffer[1] & 0x0000003ful) << 16) | ((Buffer[2] & 0xffff0000ul) >> 16);
+            size = (C_Size+1ul) * 512ul; /* Kbytes */
 
-        _info->diskSize = size / 1024;
-        _info->totalSectorN = size / 512;
+            _info->diskSize = size;
+            _info->totalSectorN = size << 1;
+        }
+        else
+        {
+            R_LEN = (Buffer[1] & 0x000f0000ul) >> 16;
+            C_Size = ((Buffer[1] & 0x000003fful) << 2) | ((Buffer[2] & 0xc0000000ul) >> 30);
+            MULT = (Buffer[2] & 0x00038000ul) >> 15;
+            size = (C_Size+1ul) * (1ul<<(MULT+2ul)) * (1ul<<R_LEN);
+
+            _info->diskSize = size / 1024ul;
+            _info->totalSectorN = size / 512ul;
+        }
     }
     _info->sectorSize = 512;
 
@@ -711,6 +765,9 @@ void SD_Get_SD_info(struct FMI_SD_INFO *pSD, struct DISK_DATA *_info)
     ptr = ptr + 10;
     for (i=0; i<4; i++)
         _info->serial[i] = *ptr++;
+
+    MSG_DEBUG("The size is %d KB\n", _info->diskSize);
+    MSG_DEBUG("            %d bytes * %d sectors\n", _info->sectorSize, _info->totalSectorN);
 }
 
 void SD_SetReferenceClock(uint32_t uClock)

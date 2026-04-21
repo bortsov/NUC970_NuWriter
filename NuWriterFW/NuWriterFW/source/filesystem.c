@@ -119,8 +119,8 @@ struct MBR* create_mbr(uint32_t TotalSecSize, struct FW_MMC_IMAGE *myPmmcImage)
     if(mbr==NULL) return NULL;
     memset(mbr, 0, sizeof(struct MBR));
 
-    sysprintf("PartitionNum =%d\n", myPmmcImage->PartitionNum);
-    sysprintf("Partition1Size =%dMB,  SectorSize1=%d\n", myPmmcImage->Partition1Size, (myPmmcImage->Partition1Size)*2*1024);
+    MSG_DEBUG("PartitionNum =%d\n", myPmmcImage->PartitionNum);
+    MSG_DEBUG("Partition1Size =%dMB,  SectorSize1=%d\n", myPmmcImage->Partition1Size, (myPmmcImage->Partition1Size)*2*1024);
     myPmmcImage->PartitionS1Size = (myPmmcImage->Partition1Size)*2*1024;///512*1024*1024;
     myPmmcImage->PartitionS2Size = (myPmmcImage->Partition2Size)*2*1024;//512*1024*1024;
     myPmmcImage->PartitionS3Size = (myPmmcImage->Partition3Size)*2*1024;//512*1024*1024;
