@@ -4,3 +4,4 @@ obj/
 *.uvgui.*
 *.uvopt
 *.bak
+*.bin

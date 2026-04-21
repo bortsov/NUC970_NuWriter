@@ -1,5 +1,6 @@
-#ifndef _FMILIB_H_
-#define _FMILIB_H_
+#pragma once
+
+#include <stdint.h>
 
 #define FMI_SD_CARD0	0
 #define FMI_SD_CARD1	1
@@ -46,24 +47,21 @@
 #define FMI_SD_CMD8_ERROR		-33
 
 // function prototype
-VOID fmiInitDevice(void);
-VOID fmiSetFMIReferenceClock(UINT32 uClock);
+void fmiInitDevice(void);
+void fmiSetFMIReferenceClock(uint32_t uClock);
 
-INT  fmiSD_Read(UINT32 uChipSel, UINT32 uSector, UINT32 uBufcnt, UINT32 uDAddr);
-INT  fmiSD_Write(UINT32 uChipSel, UINT32 uSector, UINT32 uBufcnt, UINT32 uSAddr);
-INT  fmiSM_Read(UINT32 uChipSel, UINT32 uSector, UINT32 uBufcnt, UINT32 uDAddr);
-INT  fmiSM_Write(UINT32 uChipSel, UINT32 uSector, UINT32 uBufcnt, UINT32 uSAddr);
-INT  fmiSM_ChipErase(UINT32 uChipSel);
-INT  fmiMS_Read(UINT32 uChipSel, UINT32 uSector, UINT32 uBufcnt, UINT32 uDAddr);
-INT  fmiMS_Write(UINT32 uChipSel, UINT32 uSector, UINT32 uBufcnt, UINT32 uSAddr);
+int  fmiSD_Read(uint32_t uChipSel, uint32_t uSector, uint32_t uBufcnt, uint32_t uDAddr);
+int  fmiSD_Write(uint32_t uChipSel, uint32_t uSector, uint32_t uBufcnt, uint32_t uSAddr);
+int  fmiSM_Read(uint32_t uChipSel, uint32_t uSector, uint32_t uBufcnt, uint32_t uDAddr);
+int  fmiSM_Write(uint32_t uChipSel, uint32_t uSector, uint32_t uBufcnt, uint32_t uSAddr);
+int  fmiSM_ChipErase(uint32_t uChipSel);
+int  fmiMS_Read(uint32_t uChipSel, uint32_t uSector, uint32_t uBufcnt, uint32_t uDAddr);
+int  fmiMS_Write(uint32_t uChipSel, uint32_t uSector, uint32_t uBufcnt, uint32_t uSAddr);
 
 // for file system
-INT  fmiInitSMDevice(UINT32 uChipSel);
-INT  fmiInitSDDevice(UINT32 uChipSel);
-INT  fmiInitMSDevice(UINT32 uChipSel);
-//PDISK_T *fmiGetpDisk(UINT32 uCard);
+int  fmiInitSMDevice(uint32_t uChipSel);
+int  fmiInitSDDevice(uint32_t uChipSel);
+int  fmiInitMSDevice(uint32_t uChipSel);
 
 // callback function
-VOID fmiSetCallBack(UINT32 uCard, PVOID pvRemove, PVOID pvInsert);
-
-#endif //_FMILIB_H_
+void fmiSetCallBack(uint32_t uCard, void* pvRemove, void* pvInsert);

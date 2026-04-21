@@ -8,12 +8,12 @@
 typedef struct
 {
 	char PID;
-	int (*SpiFlashWrite)(UINT32 address, UINT32 len, UCHAR *data);
+	int (*SpiFlashWrite)(uint32_t address, uint32_t len, uint8_t *data);
 } spiflash_t;
 
 
-int wbSpiWrite(UINT32 addr, UINT32 len, UINT8 *buf);
-int sstSpiWrite(UINT32 addr, UINT32 len, UINT8 *buf);
+int wbSpiWrite(uint32_t addr, uint32_t len, uint8_t *buf);
+int sstSpiWrite(uint32_t addr, uint32_t len, uint8_t *buf);
 
 int usiEnable4ByteAddressMode(void);
 int usiDisable4ByteAddressMode(void);
@@ -28,7 +28,7 @@ spiflash_t spiflash[]={
 
 /*****************************************/
 
-INT32 volatile _spi_type = -1;
+int32_t volatile _spi_type = -1;
 
 
 int usiActive()
@@ -48,7 +48,7 @@ int usiActive()
 
 int usiTxLen(int count, int bitLen)
 {
-	UINT32 reg;
+	uint32_t reg;
 
 	reg = inpw(REG_USI_CNTRL);
 
@@ -97,7 +97,7 @@ int usiCheckBusy()
 	len: byte count
 	buf: buffer to put the read back data
 */
-int usiRead(UINT32 addr, UINT32 len, UINT8 *buf)
+int usiRead(uint32_t addr, uint32_t len, uint8_t *buf)
 {
 	int volatile i;
 	if(Enable4ByteFlag==1)	usiEnable4ByteAddressMode(); 
@@ -131,7 +131,7 @@ int usiRead(UINT32 addr, UINT32 len, UINT8 *buf)
 	return Successful;
 }
 
-int usiReadFast(UINT32 addr, UINT32 len, UINT8 *buf)
+int usiReadFast(uint32_t addr, uint32_t len, uint8_t *buf)
 {
 	int volatile i;
 	if(Enable4ByteFlag==1)	usiEnable4ByteAddressMode();
@@ -226,7 +226,7 @@ int usiWriteDisable()
 	len: byte count
 	buf: buffer with write data
 */
-int usiWrite(UINT32 addr, UINT32 len, UINT8 *buf)
+int usiWrite(uint32_t addr, uint32_t len, uint8_t *buf)
 {
 	int status;
 	if(Enable4ByteFlag==1)	usiEnable4ByteAddressMode(); 
@@ -235,7 +235,7 @@ int usiWrite(UINT32 addr, UINT32 len, UINT8 *buf)
 	return status;
 }
 
-int usiEraseSector(UINT32 addr, UINT32 secCount)
+int usiEraseSector(uint32_t addr, uint32_t secCount)
 {
 	int volatile i;
 	if(Enable4ByteFlag==1)	usiEnable4ByteAddressMode();
@@ -271,7 +271,7 @@ int usiEraseSector(UINT32 addr, UINT32 secCount)
 	return Successful;
 }
 
-extern void SendAck(UINT32 status);
+extern void SendAck(uint32_t status);
 int usiEraseAll()
 {
 	unsigned int count;
@@ -316,9 +316,9 @@ int usiEraseAll()
 }
 
 
-INT16 usiReadID()
+int16_t usiReadID()
 {
-	UINT16 volatile id;
+	uint16_t volatile id;
 	int volatile i;
 
 	outpw(REG_USI_SSR, inpw(REG_USI_SSR) | 0x01);	// CS0
@@ -344,17 +344,6 @@ INT16 usiReadID()
 
 	/* find spi flash */
 	i=0;
-#if 0	// mark [2011/10/03], if not SST SPI flash, it should be WB-like
-	while(spiflash[i].PID)
-	{
-		if( spiflash[i].PID == ((id & 0xff00) >> 8) )
-		{
-			_spi_type=i;
-			break;
-		}
-		i++;
-	}
-#else
 	if (((id & 0xff00) >> 8) == 0xBF)
 		_spi_type = 1;
 	else
@@ -369,13 +358,12 @@ INT16 usiReadID()
    {
        sysprintf("Enable4ByteFlag  ID=0x%08x   _spi_type =%d\n",id, _spi_type);
    }
-#endif
 	return id;
 }
 
-UINT8 usiStatusRead()
+uint8_t usiStatusRead()
 {
-	UINT32 status;
+	uint32_t status;
 
 	outpw(REG_USI_SSR, inpw(REG_USI_SSR) | 0x01);	// CS0
 
@@ -395,7 +383,7 @@ UINT8 usiStatusRead()
 	return status;
 }
 
-int usiStatusWrite(UINT8 data)
+int usiStatusWrite(uint8_t data)
 {
 	usiWriteEnable();
 
@@ -417,17 +405,12 @@ int usiStatusWrite(UINT8 data)
 }
 
 
-BOOL volatile _usbd_bIsSPIInit = FALSE;
+bool volatile _usbd_bIsSPIInit = false;
 int usiInit()
 {
 	int volatile tick;
-	if (_usbd_bIsSPIInit == FALSE)
+	if (_usbd_bIsSPIInit == false)
 	{
-		#if 0
-		outpw(REG_CLKEN, (inpw(REG_CLKEN) | 0x20000000)); /* enable SPI clock */
-		outpw(REG_MFSEL, ((inpw(REG_MFSEL) & 0xFFFC3FFF) | 0x00028000)); /* select USI function pins */
-		#endif
-
 		outpw(REG_MFP_GPB_L, inpw(REG_MFP_GPB_L) | 0xBB000000);
 		outpw(REG_MFP_GPB_H, inpw(REG_MFP_GPB_H) | 0x000000BB);
 		//SPI0: B10, B11 = D[2], D[3]
@@ -450,13 +433,13 @@ int usiInit()
 		//while((sysGetTicks(0) - tick) < 10);
 		sysDelay(50);
 
-		_usbd_bIsSPIInit = TRUE;
+		_usbd_bIsSPIInit = true;
 	}
 	return 0;
 
 } /* end usiInit */
 
-int DelSpiSector(UINT32 start, UINT32 len)
+int DelSpiSector(uint32_t start, uint32_t len)
 {
   int i;
   for(i=0;i<len;i++)
@@ -467,18 +450,18 @@ int DelSpiSector(UINT32 start, UINT32 len)
   return Successful;
 }
 
-int DelSpiImage(UINT32 imageNo)
+int DelSpiImage(uint32_t imageNo)
 {
 	int i, count;
 	unsigned int startOffset=0, length=0;
 	unsigned char *pbuf;
 	unsigned int *ptr;
-	UCHAR _fmi_ucBuffer[64*1024];
+	uint8_t _fmi_ucBuffer[64*1024];
 
-	pbuf = (UINT8 *)((UINT32)_fmi_ucBuffer | 0x80000000);
-	ptr = (unsigned int *)((UINT32)_fmi_ucBuffer | 0x80000000);
+	pbuf = (uint8_t *)((uint32_t)_fmi_ucBuffer | 0x80000000);
+	ptr = (unsigned int *)((uint32_t)_fmi_ucBuffer | 0x80000000);
 	SendAck(10);
-	usiRead( (SPI_HEAD_ADDR-1)*64*1024, 64*1024, (UINT8 *)pbuf);
+	usiRead( (SPI_HEAD_ADDR-1)*64*1024, 64*1024, (uint8_t *)pbuf);
 	ptr = (unsigned int *)(pbuf + 63*1024);
 	SendAck(30);
 	if (((*(ptr+0)) == 0xAA554257) && ((*(ptr+3)) == 0x63594257))
@@ -525,17 +508,17 @@ int DelSpiImage(UINT32 imageNo)
 	return Successful;
 }
 
-int ChangeSpiImageType(UINT32 imageNo, UINT32 imageType)
+int ChangeSpiImageType(uint32_t imageNo, uint32_t imageType)
 {
 	int i, count;
 	unsigned char *pbuf;
 	unsigned int *ptr;
-	UCHAR _fmi_ucBuffer[64*1024];
+	uint8_t _fmi_ucBuffer[64*1024];
 
-	pbuf = (UINT8 *)((UINT32)_fmi_ucBuffer | 0x80000000);
-	ptr = (unsigned int *)((UINT32)_fmi_ucBuffer | 0x80000000);
+	pbuf = (uint8_t *)((uint32_t)_fmi_ucBuffer | 0x80000000);
+	ptr = (unsigned int *)((uint32_t)_fmi_ucBuffer | 0x80000000);
 
-	usiRead( (SPI_HEAD_ADDR-1)*64*1024, 64*1024, (UINT8 *)pbuf);
+	usiRead( (SPI_HEAD_ADDR-1)*64*1024, 64*1024, (uint8_t *)pbuf);
 	ptr = (unsigned int *)(pbuf + 63*1024);
 
 	if (((*(ptr+0)) == 0xAA554257) && ((*(ptr+3)) == 0x63594257))
@@ -567,7 +550,7 @@ int ChangeSpiImageType(UINT32 imageNo, UINT32 imageType)
 /******************************************/
 /* write function for different spi flash */
 /******************************************/
-int wbSpiWrite(UINT32 addr, UINT32 len, UINT8 *buf)
+int wbSpiWrite(uint32_t addr, uint32_t len, uint8_t *buf)
 {
 	int volatile count=0, page, i;
 	count = len / 256;
@@ -617,7 +600,7 @@ int wbSpiWrite(UINT32 addr, UINT32 len, UINT8 *buf)
 	return Successful;
 }
 
-int sstSpiWrite(UINT32 addr, UINT32 len, UINT8 *buf)
+int sstSpiWrite(uint32_t addr, uint32_t len, uint8_t *buf)
 {
 	while (len > 0)
 	{

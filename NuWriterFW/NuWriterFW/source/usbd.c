@@ -18,7 +18,7 @@
 /*-----------------------------------------------------------------------------------*/
 #include "usbd.h"
 
-extern UCHAR NandBlockSize;
+extern uint8_t NandBlockSize;
 
 /* Define the vendor id and product id */
 #define USB_VID		0x0416
@@ -26,7 +26,7 @@ extern UCHAR NandBlockSize;
 
 #define printf	sysprintf
 
-//extern UINT32 volatile Mass_Base_Addr, Storage_Base_Addr;
+//extern uint32_t volatile Mass_Base_Addr, Storage_Base_Addr;
 
 #define USE_TOKEN	0
 
@@ -56,63 +56,63 @@ extern UCHAR NandBlockSize;
 
 /* for USB */
 USB_CMD_T	_usb_cmd_pkt;
-UINT32 volatile _usbd_remlen=0;
-UINT8 volatile _usbd_remlen_flag=0;
-UINT8 *_usbd_ptr;
+uint32_t volatile _usbd_remlen=0;
+uint8_t volatile _usbd_remlen_flag=0;
+uint8_t *_usbd_ptr;
 
-UINT8 volatile GET_DEV_Flag=0;
-UINT8 volatile GET_CFG_Flag=0;
-UINT8 volatile GET_QUL_Flag=0;
-UINT8 volatile GET_OSCFG_Flag=0;
-UINT8 volatile GET_STR_Flag=0;
-UINT8 volatile CLASS_CMD_Flag=0;
-UINT8 volatile usbdGetConfig=0;
-UINT8 volatile usbdGetInterface=0;
-UINT8 volatile usbdGetStatus=0;
-UINT8 volatile GET_VEN_Flag=0;
+uint8_t volatile GET_DEV_Flag=0;
+uint8_t volatile GET_CFG_Flag=0;
+uint8_t volatile GET_QUL_Flag=0;
+uint8_t volatile GET_OSCFG_Flag=0;
+uint8_t volatile GET_STR_Flag=0;
+uint8_t volatile CLASS_CMD_Flag=0;
+uint8_t volatile usbdGetConfig=0;
+uint8_t volatile usbdGetInterface=0;
+uint8_t volatile usbdGetStatus=0;
+uint8_t volatile GET_VEN_Flag=0;
 
 // for DMA state flag
-UINT8 volatile _usbd_DMA_Flag=0;
-UINT8 volatile _usbd_Less_MPS=0;
-UINT8 volatile _usbd_DMA_Dir;
+uint8_t volatile _usbd_DMA_Flag=0;
+uint8_t volatile _usbd_Less_MPS=0;
+uint8_t volatile _usbd_DMA_Dir;
 
-UINT8 volatile bulkonlycmd=0;
-UINT8 volatile USBPlugIn=0;
+uint8_t volatile bulkonlycmd=0;
+uint8_t volatile USBPlugIn=0;
 
-UINT32 volatile usbdMaxPacketSize=200;
+uint32_t volatile usbdMaxPacketSize=200;
 // _usbd_devstate:	1.default state 2.addressed state 3.configured state
-UINT32	_usbd_devstate;
-UINT32	_usbd_address;
-UINT32	_usbd_speedset;
-UINT16	_usbd_confsel;
-UINT16	_usbd_altsel;
-UINT32	_usbd_haltep0=0;
-UINT8	_usbd_haltep1=0;
-UINT8	_usbd_haltep2=0;
-UINT8 _usbd_unhaltep=0xff;
+uint32_t	_usbd_devstate;
+uint32_t	_usbd_address;
+uint32_t	_usbd_speedset;
+uint16_t	_usbd_confsel;
+uint16_t	_usbd_altsel;
+uint32_t	_usbd_haltep0=0;
+uint8_t	_usbd_haltep1=0;
+uint8_t	_usbd_haltep2=0;
+uint8_t _usbd_unhaltep=0xff;
 
-INT32		remotewakeup=0;
-INT32		enableremotewakeup;
-INT32		enabletestmode;
-INT32		disableremotewakeup;
-INT32		testselector;
-UINT32	usbdGetStatusData;
+int32_t		remotewakeup=0;
+int32_t		enableremotewakeup;
+int32_t		enabletestmode;
+int32_t		disableremotewakeup;
+int32_t		testselector;
+uint32_t	usbdGetStatusData;
 
 //------------------------------------------
-UINT32 ChipID;
+uint32_t ChipID;
 unsigned int volatile FLASH_BASE;
-UINT32 volatile Bulk_Out_Transfer_Size=0;
+uint32_t volatile Bulk_Out_Transfer_Size=0;
 
 int volatile _usbd_IntraROM;
 int volatile _usbd_flash_type = -1;
 int volatile _usbd_xusb_type = -1;
-UINT8 imgInfo_raw[400], *pImgInfo_raw;
+uint8_t imgInfo_raw[400], *pImgInfo_raw;
 //------------------------------------------
 
 #define LEDON() (outpw(REG_GPIOH_DATAOUT, inpw(REG_GPIOH_DATAOUT) & (~0x00000002)))
 #define LEDOFF() (outpw(REG_GPIOH_DATAOUT, inpw(REG_GPIOH_DATAOUT) | 0x00000002))
 
-void leddisplay(UINT8 u8parm)
+void leddisplay(uint8_t u8parm)
 {
     outpw(REG_MFP_GPH_L, inpw(REG_MFP_GPH_L) & (~0x000000f0));	// GPH1 select gpio function
     outpw(REG_GPIOH_DIR, inpw(REG_GPIOH_DIR) | 0x00000002);	// set GPH1 as out
@@ -126,47 +126,47 @@ void leddisplay(UINT8 u8parm)
     }
 }
 
-extern UINT8 udcFlashInit(void);
+extern uint8_t udcFlashInit(void);
 
 /*!<USB Device Descriptor */
-__align(4) static UINT16 _DeviceDescriptor[10] = {
+__align(4) static uint16_t _DeviceDescriptor[10] = {
     0x0112, 0x0200, 0x0000, 0x4000, 0x0416, 0x5963, 0x0100, 0x0201, 0x0100, 0x0000
 };
 
-__align(4) static UINT16 _QualifierDescriptor[6] = {
+__align(4) static uint16_t _QualifierDescriptor[6] = {
     0x060a, 0x0200, 0x0000, 0x4000, 0x0001, 0x0000
 };
 
-__align(4) static UINT16 _ConfigurationBlock[16] = {
+__align(4) static uint16_t _ConfigurationBlock[16] = {
     0x0209, 0x0020, 0x0101, 0xC000, 0x0932, 0x0004, 0x0200, 0x0000, 0x0000, 0x0507,
     0x0281, 0x0200, 0x0701, 0x0205, 0x0002, 0x0102
 };
 
-__align(4) static UINT16 _ConfigurationBlockFull[16] = {
+__align(4) static uint16_t _ConfigurationBlockFull[16] = {
     0x0209, 0x0020, 0x0101, 0xc000, 0x0932, 0x0004, 0x0200, 0x0000, 0x0000, 0x0507,
     0x0281, 0x0040, 0x0701, 0x0205, 0x4002, 0x0100
 };
 
-__align(4) static UINT16 _OSConfigurationBlock[16] = {
+__align(4) static uint16_t _OSConfigurationBlock[16] = {
     0x0709, 0x0020, 0x0101, 0xc000, 0x0932, 0x0004, 0x0200, 0x0000, 0x0000, 0x0507,
     0x0281, 0x0040, 0x0701, 0x0205, 0x4002, 0x0100
 };
 
-__align(4) static UINT16 _StringDescriptor0[2] = {
+__align(4) static uint16_t _StringDescriptor0[2] = {
     0x0304, 0x0409
 };
 
-__align(4) static UINT16 _StringDescriptor1[11] = {
+__align(4) static uint16_t _StringDescriptor1[11] = {
     0x0316, 0x0055, 0x0053, 0x0042, 0x0020, 0x0044, 0x0065, 0x0076, 0x69, 0x0063, 0x0065
 };
 
-__align(4) static UINT16 _StringDescriptor2[26] = {
+__align(4) static uint16_t _StringDescriptor2[26] = {
     0x0334, 0x004E, 0x0075, 0x0076, 0x006F, 0x0074, 0x006F, 0x006E, 0x0020, 0x0041,
     0x0052, 0x004D, 0x0020, 0x0039, 0x0032, 0x0036, 0x002D, 0x0042, 0x0061, 0x0073,
     0x0065, 0x0064, 0x0020, 0x004D, 0x0043, 0x0055
 };
 
-void SendAck(UINT32 status)
+void SendAck(uint32_t status)
 {
     char buf[4];
     unsigned int *state;
@@ -176,12 +176,12 @@ void SendAck(UINT32 status)
     usb_send((unsigned char *)state, 4);//send ack to PC
 }
 
-int usb_recv(UINT8* buf,UINT32 len)
+int usb_recv(uint8_t* buf,uint32_t len)
 {
     _usbd_DMA_Dir = Ep_Out;
 
     outpw(REG_USBD_DMA_CTRL_STS, (inpw(REG_USBD_DMA_CTRL_STS)&0xe0) | 0x02);	// bulk out, dma write, ep2
-    SDRAM_USB_Transfer((UINT32)buf,len);
+    SDRAM_USB_Transfer((uint32_t)buf,len);
     Bulk_Out_Transfer_Size = 0;
 
     outpw(REG_USBD_CEP_IRQ_ENB, (CEP_SUPPKT | CEP_STS_END));//lsshi
@@ -189,7 +189,7 @@ int usb_recv(UINT8* buf,UINT32 len)
     return len;
 }
 
-int usb_send(UINT8* buf,UINT32 len)
+int usb_send(uint8_t* buf,uint32_t len)
 {
     int volatile count;
     _usbd_DMA_Dir = Ep_In;
@@ -202,8 +202,8 @@ int usb_send(UINT8* buf,UINT32 len)
             __nop();
         }
         _usbd_Less_MPS=0;
-        SDRAM_USB_Transfer((UINT32)buf,count*usbdMaxPacketSize);
-        buf = (UINT8 *)((UINT32)buf + count*usbdMaxPacketSize);
+        SDRAM_USB_Transfer((uint32_t)buf,count*usbdMaxPacketSize);
+        buf = (uint8_t *)((uint32_t)buf + count*usbdMaxPacketSize);
     }
 
     count = len % usbdMaxPacketSize;
@@ -214,7 +214,7 @@ int usb_send(UINT8* buf,UINT32 len)
         }
 
         _usbd_Less_MPS=1;
-        SDRAM_USB_Transfer((UINT32)buf,count);
+        SDRAM_USB_Transfer((uint32_t)buf,count);
     }
 
     return len;
@@ -304,10 +304,10 @@ void usbd_update_device()
 
 void usbd_send_descriptor()
 {
-    UINT32 temp_cnt;
-    //UINT16 volatile data;
+    uint32_t temp_cnt;
+    //uint16_t volatile data;
     int volatile i;
-    UINT8 *ptr=NULL;
+    uint8_t *ptr=NULL;
 
     if ((GET_DEV_Flag == 1) || (GET_QUL_Flag == 1) || (GET_CFG_Flag == 1) ||
             (GET_OSCFG_Flag == 1) || (GET_STR_Flag == 1) ||  (CLASS_CMD_Flag == 1) ||
@@ -315,23 +315,23 @@ void usbd_send_descriptor()
             (GET_VEN_Flag == 1)) {
         if (_usbd_remlen_flag == 0) {
             if (GET_DEV_Flag == 1)
-                ptr = (UINT8 *)_DeviceDescriptor;
+                ptr = (uint8_t *)_DeviceDescriptor;
             else if (GET_QUL_Flag == 1)
-                ptr = (UINT8 *)_QualifierDescriptor;
+                ptr = (uint8_t *)_QualifierDescriptor;
             else if (GET_CFG_Flag == 1) {
                 if (_usbd_speedset == 2)
-                    ptr = (UINT8 *)_ConfigurationBlock;
+                    ptr = (uint8_t *)_ConfigurationBlock;
                 else if (_usbd_speedset == 1)
-                    ptr = (UINT8 *)_ConfigurationBlockFull;
+                    ptr = (uint8_t *)_ConfigurationBlockFull;
             } else if (GET_OSCFG_Flag == 1)
-                ptr = (UINT8 *)_OSConfigurationBlock;
+                ptr = (uint8_t *)_OSConfigurationBlock;
             else if (GET_STR_Flag == 1) {
                 if ((_usb_cmd_pkt.wValue & 0xff) == 0)
-                    ptr = (UINT8 *)_StringDescriptor0;
+                    ptr = (uint8_t *)_StringDescriptor0;
                 else if ((_usb_cmd_pkt.wValue & 0xff) == 1)
-                    ptr = (UINT8 *)_StringDescriptor1;
+                    ptr = (uint8_t *)_StringDescriptor1;
                 else if ((_usb_cmd_pkt.wValue & 0xff) == 2)
-                    ptr = (UINT8 *)_StringDescriptor2;
+                    ptr = (uint8_t *)_StringDescriptor2;
             } else if (CLASS_CMD_Flag == 1) {
                 outpb(REG_USBD_CEP_DATA_BUF, 0);
                 outpw(REG_USBD_IN_TRNSFR_CNT, 1);
@@ -377,7 +377,7 @@ void usbd_send_descriptor()
         temp_cnt = _usb_cmd_pkt.wLength / 4;
 
         for (i=0; i<temp_cnt; i++, ptr+=4)
-            outpw(REG_USBD_CEP_DATA_BUF, *(UINT32 *)ptr);
+            outpw(REG_USBD_CEP_DATA_BUF, *(uint32_t *)ptr);
 
         temp_cnt = _usb_cmd_pkt.wLength % 4;
 
@@ -393,14 +393,14 @@ void usbd_send_descriptor()
 
 void usbd_control_packet()
 {
-    UINT32	temp;
-    UINT8	ReqErr=0;
+    uint32_t	temp;
+    uint8_t	ReqErr=0;
     temp = inpw(REG_USBD_SETUP1_0);
-    _usb_cmd_pkt.bmRequestType = (UINT8)temp & 0xff;
-    _usb_cmd_pkt.bRequest = (UINT8)(temp >> 8) & 0xff;
-    _usb_cmd_pkt.wValue = (UINT16)inpw(REG_USBD_SETUP3_2);
-    _usb_cmd_pkt.wIndex = (UINT16)inpw(REG_USBD_SETUP5_4);
-    _usb_cmd_pkt.wLength = (UINT16)inpw(REG_USBD_SETUP7_6);
+    _usb_cmd_pkt.bmRequestType = (uint8_t)temp & 0xff;
+    _usb_cmd_pkt.bRequest = (uint8_t)(temp >> 8) & 0xff;
+    _usb_cmd_pkt.wValue = (uint16_t)inpw(REG_USBD_SETUP3_2);
+    _usb_cmd_pkt.wIndex = (uint16_t)inpw(REG_USBD_SETUP5_4);
+    _usb_cmd_pkt.wLength = (uint16_t)inpw(REG_USBD_SETUP7_6);
     // vendor command
     if (_usb_cmd_pkt.bmRequestType == 0x40) {
         // clear flags
@@ -911,7 +911,7 @@ void usbd_control_packet()
 
 void USBD_IRQHandler(void)
 {
-    UINT32 volatile IrqStL, IrqEnL, IrqSt, IrqEn;
+    uint32_t volatile IrqStL, IrqEnL, IrqSt, IrqEn;
 
     IrqStL = inpw(REG_USBD_IRQ_STAT_L);		/* get interrupt status */
     IrqEnL = inpw(REG_USBD_IRQ_ENB_L);
@@ -925,7 +925,7 @@ void USBD_IRQHandler(void)
         IrqSt = inpw(REG_USBD_IRQ_STAT);
         IrqEn = inpw(REG_USBD_IRQ_ENB);
 
-//MSG_DEBUG("INT status[%x], oper[%x]\n", IrqSt, inpw(REG_USBD_OPER));
+//MSG_DEBUG("int status[%x], oper[%x]\n", IrqSt, inpw(REG_USBD_OPER));
 
         if (IrqSt & USB_SOF & IrqEn) {
             MSG_DEBUG("SOF Interrupt\n");
@@ -1015,7 +1015,7 @@ void USBD_IRQHandler(void)
         IrqSt = inpw(REG_USBD_CEP_IRQ_STAT);
         IrqEn = inpw(REG_USBD_CEP_IRQ_ENB);
 
-        MSG_DEBUG("control INT status[%x]\n", IrqSt);
+        MSG_DEBUG("control int status[%x]\n", IrqSt);
 
         if (IrqSt & CEP_SUPTOK & IrqEn) {
             //MSG_DEBUG("Setup Token Interrupt\n");
@@ -1186,7 +1186,7 @@ isr_end:
     return;  /* return is compile issue of single task library */
 }
 
-void SDRAM_USB_Transfer(UINT32 DRAM_Addr ,UINT32 Tran_Size)
+void SDRAM_USB_Transfer(uint32_t DRAM_Addr ,uint32_t Tran_Size)
 {
     if(Tran_Size != 0) {
         outpw(REG_USBD_IRQ_ENB, (USB_DMA_REQ | USB_RST_STS | USB_SUS_REQ ));
@@ -1201,11 +1201,11 @@ void SDRAM_USB_Transfer(UINT32 DRAM_Addr ,UINT32 Tran_Size)
 }
 
 /* USB means usb host, sdram->host=> bulk in */
-void SDRAM2USB_Bulk(UINT32 DRAM_Addr ,UINT32 Tran_Size)
+void SDRAM2USB_Bulk(uint32_t DRAM_Addr ,uint32_t Tran_Size)
 {
     unsigned int volatile count=0;
     int volatile i=0, loop;
-    UINT32 volatile addr, len;
+    uint32_t volatile addr, len;
 
     //printf("SDRAM2USB_Bulk: addr[%x], size[%d]\n", DRAM_Addr, Tran_Size);
 
@@ -1254,7 +1254,7 @@ void SDRAM2USB_Bulk(UINT32 DRAM_Addr ,UINT32 Tran_Size)
     }
 }
 
-void USB2SDRAM_Bulk(UINT32 DRAM_Addr ,UINT32 Tran_Size)
+void USB2SDRAM_Bulk(uint32_t DRAM_Addr ,uint32_t Tran_Size)
 {
     int volatile i=0, loop;
 
@@ -1320,8 +1320,8 @@ void usbdFullSpeedInit()
 
 void udcInit(void)
 {
-    UINT32 volatile gDramSize;
-    //UINT32 i;
+    uint32_t volatile gDramSize;
+    //uint32_t i;
     outpw(REG_MFP_GPH_L, 0x00000007);
 
     /* Enable USB Clock */
@@ -1364,7 +1364,7 @@ void udcInit(void)
     outpw(REG_USBD_CEP_IRQ_ENB, (CEP_SUPPKT | CEP_STS_END));
 
     /* Enable Interrupt Handler */
-    sysInstallISR(IRQ_LEVEL_1, IRQ_UDC, (PVOID)USBD_IRQHandler);
+    sysInstallISR(IRQ_LEVEL_1, IRQ_UDC, (void*)USBD_IRQHandler);
     sysEnableInterrupt(IRQ_UDC);
 
     /* enable CPSR I bit */

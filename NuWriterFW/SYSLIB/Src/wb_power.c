@@ -32,12 +32,12 @@
 #include <string.h>
 #include "wblib.h"
 
-extern BOOL	sysGetCacheState(void);
-extern INT32 sysGetCacheMode(void);
-extern INT32 _sysLockCode(UINT32, INT32);
-extern INT32 _sysUnLockCode(void);
+extern bool	sysGetCacheState(void);
+extern int32_t sysGetCacheMode(void);
+extern int32_t _sysLockCode(uint32_t, int32_t);
+extern int32_t _sysUnLockCode(void);
 
-static UINT32 volatile _sys_PM_IRQ = 0;
+static uint32_t volatile _sys_PM_IRQ = 0;
 
 /****************************************************************************
 * FUNCTION
@@ -56,14 +56,14 @@ static UINT32 volatile _sys_PM_IRQ = 0;
 *   WB_PM_INVALID_IRQ_NUM   The interrupt channel number out of range
 *
 ****************************************************************************/
-INT sysEnablePM_IRQ(INT irq_no) // set the PM needed IRQ flag
+int sysEnablePM_IRQ(int irq_no) // set the PM needed IRQ flag
 {
     if ((irq_no > 31) || (irq_no < 1))
     {
         return WB_PM_INVALID_IRQ_NUM;
     }
 
-    _sys_PM_IRQ = _sys_PM_IRQ | (UINT32)(1<<irq_no);
+    _sys_PM_IRQ = _sys_PM_IRQ | (uint32_t)(1<<irq_no);
     return Successful;
 }
 
@@ -101,9 +101,9 @@ void sysDisableAllPM_IRQ(void)  // clear the PM IRQ flag
 *   None
 *
 ****************************************************************************/
-void _sysEnterPowerSavingMode(INT mode, UINT32 irqno)
+void _sysEnterPowerSavingMode(int mode, uint32_t irqno)
 {
-	volatile UINT32 i;
+	volatile uint32_t i;
 		
     outpw(REG_AIC_MECR, irqno); /* interrupt source to return from power saving mode */            
     outpw(REG_PMCON, mode);     /* write control register to enter power saving mode */             
@@ -132,12 +132,12 @@ void _sysEnterPowerSavingMode(INT mode, UINT32 irqno)
 *                       instructions into cache
 *
 ****************************************************************************/
-INT sysPMStart(INT pd_type)
+int sysPMStart(int pd_type)
 {
-    INT32    (*wb_func)(UINT32, INT32);
-    BOOL     cache_status;
+    int32_t    (*wb_func)(uint32_t, int32_t);
+    bool     cache_status;
     WB_PLL_T _oldsysClk, _newsysClk;
-    UINT32   aic_status = 0;
+    uint32_t   aic_status = 0;
 
     if(pd_type != WB_PM_IDLE && pd_type != WB_PM_MIDLE && pd_type != WB_PM_PD)
     {
@@ -159,7 +159,7 @@ INT sysPMStart(INT pd_type)
     	// Check cache status. We need to run the necessary instructions from cache to
     	// let CPU enter power saving mode.
     	cache_status = sysGetCacheState();
-    	if (cache_status == FALSE)   return WB_PM_CACHE_OFF;
+    	if (cache_status == false)   return WB_PM_CACHE_OFF;
     }
 
     aic_status = inpw(REG_AIC_IMR);
@@ -168,8 +168,8 @@ INT sysPMStart(INT pd_type)
     if ((pd_type == WB_PM_MIDLE) || (pd_type == WB_PM_PD))
     {
     	// Lock the power-down codes into cache
-        wb_func = (INT32(*)(UINT32, INT32)) (0x80000000 | (UINT32) _sysLockCode);
-        wb_func((UINT32)_sysEnterPowerSavingMode, 256);      		
+        wb_func = (int32_t(*)(uint32_t, int32_t)) (0x80000000 | (uint32_t) _sysLockCode);
+        wb_func((uint32_t)_sysEnterPowerSavingMode, 256);      		
     }
 
 	// Select CPU clock from external clock source

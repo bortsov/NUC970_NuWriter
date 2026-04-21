@@ -1,3 +1,5 @@
+#pragma once
+
 #if defined(TURBOWRITER64)
 #define EXEADDR 0x03F00040
 #elif defined(TURBOWRITER32)

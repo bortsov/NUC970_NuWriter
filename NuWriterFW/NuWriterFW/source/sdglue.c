@@ -22,17 +22,17 @@
 
  //#define USING_FAT32
 
- DISK_DATA_T SD_DiskInfo;
- FMI_SD_INFO_T *pSD0 = NULL;
- UINT8 pSD0_offset = 0;
+ struct DISK_DATA SD_DiskInfo;
+ struct FMI_SD_INFO *pSD0 = NULL;
+ uint8_t pSD0_offset = 0;
 
-INT  fmiInitSDDevice(void)
+int  fmiInitSDDevice(void)
 {
 
 #ifdef USING_FAT32
     PDISK_T* pSDDisk;
 #endif
-    FMI_SD_INFO_T *pSD_temp = NULL;
+    struct FMI_SD_INFO *pSD_temp = NULL;
 
     /* select NAND function pins */
     if (inpw(REG_PWRON) & 0x08000000)
@@ -56,16 +56,16 @@ INT  fmiInitSDDevice(void)
     outpw(REG_NAND_SDCSR, (inpw(REG_NAND_SDCSR) & ~SD_CSR_BLK_CNT_MASK) | (0x01 << 16));    // set BLKCNT = 1
     outpw(REG_NAND_SDCSR, inpw(REG_NAND_SDCSR) & ~SD_CSR_DBW_4BIT);     // SD 1-bit data bus
 
-    pSD_temp = malloc(sizeof(FMI_SD_INFO_T)+4);
+    pSD_temp = malloc(sizeof(struct FMI_SD_INFO)+4);
     if (pSD_temp == NULL)
         return -1;
 
-    memset((char *)pSD_temp, 0, sizeof(FMI_SD_INFO_T)+4);
+    memset((char *)pSD_temp, 0, sizeof(struct FMI_SD_INFO)+4);
 
-    pSD0_offset = (UINT32)pSD_temp % 4;
-    pSD0 = (FMI_SD_INFO_T *)((UINT32)pSD_temp + pSD0_offset);
+    pSD0_offset = (uint32_t)pSD_temp % 4;
+    pSD0 = (struct FMI_SD_INFO *)((uint32_t)pSD_temp + pSD0_offset);
 
-    pSD0->bIsCardInsert = TRUE;
+    pSD0->bIsCardInsert = true;
     if (SD_Init(pSD0) < 0)
         return SD_INIT_ERROR;
 
@@ -108,7 +108,7 @@ INT  fmiInitSDDevice(void)
     return SD_DiskInfo.totalSectorN;
 }
 
-INT fmiSD_Read(UINT32 uSector, UINT32 uBufcnt, UINT32 uDAddr)
+int fmiSD_Read(uint32_t uSector, uint32_t uBufcnt, uint32_t uDAddr)
 {
     int status=0;
     // enable SD
@@ -116,7 +116,7 @@ INT fmiSD_Read(UINT32 uSector, UINT32 uBufcnt, UINT32 uDAddr)
     return status;
 }
 
-INT fmiSD_Write(UINT32 uSector, UINT32 uBufcnt, UINT32 uSAddr)
+int fmiSD_Write(uint32_t uSector, uint32_t uBufcnt, uint32_t uSAddr)
 {
     int status=0;
     // enable SD
@@ -132,23 +132,23 @@ INT fmiSD_Write(UINT32 uSector, UINT32 uBufcnt, UINT32 uSAddr)
  *  eMMC Functions
  *
  ******************************************************************************/
-static BOOL bIsmmcMatch = FALSE;
-static UINT32 *pmmcUpdateImage=0;
+static bool bIsmmcMatch = false;
+static uint32_t *pmmcUpdateImage=0;
 
 extern unsigned char *pImageList;
 extern unsigned char imageList[400];
 
-FW_MMC_IMAGE_T mmcImage;
-FW_MMC_IMAGE_T *pmmcImage;
+struct FW_MMC_IMAGE mmcImage;
+struct FW_MMC_IMAGE *pmmcImage;
 
-UINT32 GetMMCReserveSpace()
+uint32_t GetMMCReserveSpace()
 {
     unsigned int volatile *ptr;
-    UINT32 volatile bmark, emark;
-    UCHAR _fmi_ucBuffer[512];
+    uint32_t volatile bmark, emark;
+    uint8_t _fmi_ucBuffer[512];
     unsigned int volatile size=0;
-    ptr = (unsigned int *)((UINT32)_fmi_ucBuffer | 0x80000000);
-    fmiSD_Read(MMC_INFO_SECTOR,1,(UINT32)ptr);
+    ptr = (unsigned int *)((uint32_t)_fmi_ucBuffer | 0x80000000);
+    fmiSD_Read(MMC_INFO_SECTOR,1,(uint32_t)ptr);
     bmark = *(ptr+125);
     emark = *(ptr+127);
     MSG_DEBUG("ReserveSpace=>bmark=0x%08x,emark=0x%08x\n",bmark,emark);
@@ -158,16 +158,16 @@ UINT32 GetMMCReserveSpace()
       size=0;
     return size;
 }
-UINT32 GetMMCImageInfo(unsigned int *image)
+uint32_t GetMMCImageInfo(unsigned int *image)
 {
-    UINT32 volatile bmark, emark;
+    uint32_t volatile bmark, emark;
     int volatile i, imageCount=0;
     unsigned int volatile *ptr;
-    FW_MMC_IMAGE_T *pmmcimage=NULL;
-    UCHAR _fmi_ucBuffer[512];
+    struct FW_MMC_IMAGE *pmmcimage=NULL;
+    uint8_t _fmi_ucBuffer[512];
 
-  ptr = (unsigned int *)((UINT32)_fmi_ucBuffer | 0x80000000);
-    fmiSD_Read(MMC_INFO_SECTOR,1,(UINT32)ptr);
+  ptr = (unsigned int *)((uint32_t)_fmi_ucBuffer | 0x80000000);
+    fmiSD_Read(MMC_INFO_SECTOR,1,(uint32_t)ptr);
     bmark = *(ptr+0);
     emark = *(ptr+3);
   MSG_DEBUG("bmark=0x%08x,emark=0x%08x\n",bmark,emark);
@@ -177,14 +177,14 @@ UINT32 GetMMCImageInfo(unsigned int *image)
 
         /* pointer to image information */
         ptr = ptr+4;
-        pmmcimage=(FW_MMC_IMAGE_T *)image;
+        pmmcimage=(struct FW_MMC_IMAGE *)image;
         for (i=0; i<imageCount; i++)
         {
             /* fill into the image list buffer */
             pmmcimage->actionFlag=0;
             pmmcimage->fileLength = 0;
             pmmcimage->imageNo= *(ptr) & 0xffff;
-            memcpy((CHAR *)pmmcimage->imageName,(char *)(ptr+4),16);
+            memcpy((char *)pmmcimage->imageName,(char *)(ptr+4),16);
             pmmcimage->imageType = (*(ptr) >> 16) & 0xffff;
             pmmcimage->executeAddr = *(ptr+2);
             pmmcimage->flashOffset = *(ptr+1);
@@ -208,18 +208,18 @@ UINT32 GetMMCImageInfo(unsigned int *image)
 }
 
 
-int SetMMCImageInfo(FW_MMC_IMAGE_T *mmcImageInfo)
+int SetMMCImageInfo(struct FW_MMC_IMAGE *mmcImageInfo)
 {
     int i, count=0;
     unsigned char *pbuf;
     unsigned int *ptr, *pImage;
-    UCHAR _fmi_ucBuffer[512];
+    uint8_t _fmi_ucBuffer[512];
 
-    pbuf = (UINT8 *)((UINT32)_fmi_ucBuffer | 0x80000000);
-    ptr = (unsigned int *)((UINT32)_fmi_ucBuffer | 0x80000000);
+    pbuf = (uint8_t *)((uint32_t)_fmi_ucBuffer | 0x80000000);
+    ptr = (unsigned int *)((uint32_t)_fmi_ucBuffer | 0x80000000);
 
 
-    fmiSD_Read(MMC_INFO_SECTOR,1,(UINT32)ptr);
+    fmiSD_Read(MMC_INFO_SECTOR,1,(uint32_t)ptr);
 
     pImage = ptr+4;
 
@@ -233,7 +233,7 @@ int SetMMCImageInfo(FW_MMC_IMAGE_T *mmcImageInfo)
             if ((*pImage & 0xffff) == mmcImageInfo->imageNo)
             {
                 pmmcUpdateImage = pImage;
-                bIsmmcMatch = TRUE;
+                bIsmmcMatch = true;
                 break;
             }
             /* pointer to next image */
@@ -255,20 +255,20 @@ int SetMMCImageInfo(FW_MMC_IMAGE_T *mmcImageInfo)
     *(pmmcUpdateImage+3) = mmcImageInfo->flashOffset+((mmcImageInfo->fileLength+SD_SECTOR-1)>>9)-1;
     memcpy((char *)(pmmcUpdateImage+4), mmcImageInfo->imageName, 16);   // image name
 
-    fmiSD_Write(MMC_INFO_SECTOR,1,(UINT32)pbuf);
+    fmiSD_Write(MMC_INFO_SECTOR,1,(uint32_t)pbuf);
 
     return Successful;
 }
 
-int ChangeMMCImageType(UINT32 imageNo, UINT32 imageType)
+int ChangeMMCImageType(uint32_t imageNo, uint32_t imageType)
 {
     int i, count;
     unsigned int *ptr;
-    UCHAR _fmi_ucBuffer[512];
+    uint8_t _fmi_ucBuffer[512];
 
-    ptr = (unsigned int *)((UINT32)_fmi_ucBuffer | 0x80000000);
+    ptr = (unsigned int *)((uint32_t)_fmi_ucBuffer | 0x80000000);
 
-    fmiSD_Read(MMC_INFO_SECTOR,1,(UINT32)ptr);
+    fmiSD_Read(MMC_INFO_SECTOR,1,(uint32_t)ptr);
 
     if (((*(ptr+0)) == 0xAA554257) && ((*(ptr+3)) == 0x63594257))
     {
@@ -288,26 +288,26 @@ int ChangeMMCImageType(UINT32 imageNo, UINT32 imageType)
         }
     }
 
-    fmiSD_Write(MMC_INFO_SECTOR,1,(UINT32)_fmi_ucBuffer);
+    fmiSD_Write(MMC_INFO_SECTOR,1,(uint32_t)_fmi_ucBuffer);
 
     return Successful;
 }
 
-int DelMMCImage(UINT32 imageNo)
+int DelMMCImage(uint32_t imageNo)
 {
     int i=0, count;
     unsigned int *ptr,*ptr2;
-    //UCHAR _fmi_ucBuffer[512];
-    UCHAR *_fmi_ucBuffer=(UCHAR *)(DOWNLOAD_BASE);
-    ptr2 = ptr = (unsigned int *)((UINT32)_fmi_ucBuffer | 0x80000000);
+    //uint8_t _fmi_ucBuffer[512];
+    uint8_t *_fmi_ucBuffer=(uint8_t *)(DOWNLOAD_BASE);
+    ptr2 = ptr = (unsigned int *)((uint32_t)_fmi_ucBuffer | 0x80000000);
     MSG_DEBUG("Del mmc flash Image imageNo=%d ...\n",imageNo);
     SendAck(10);
-    fmiSD_Read(MMC_INFO_SECTOR,1,(UINT32)_fmi_ucBuffer);
+    fmiSD_Read(MMC_INFO_SECTOR,1,(uint32_t)_fmi_ucBuffer);
     if(imageNo==0xffffffff) // clear all
     {
         memset((char *)_fmi_ucBuffer+16,0xff,512-16-12);
         *(ptr+1)=0x0;
-        fmiSD_Write(MMC_INFO_SECTOR,1,(UINT32)_fmi_ucBuffer);
+        fmiSD_Write(MMC_INFO_SECTOR,1,(uint32_t)_fmi_ucBuffer);
         SendAck(100);
         return Successful;
     }
@@ -327,7 +327,7 @@ int DelMMCImage(UINT32 imageNo)
                     memcpy((char *)ptr, (char *)(ptr+8), (count-i-1)*32);
                     MSG_DEBUG("Get Del mmc flash Image imageNo=%d ...\n",i);
                     /* send status */
-                    fmiSD_Write(MMC_INFO_SECTOR,1,(UINT32)_fmi_ucBuffer);
+                    fmiSD_Write(MMC_INFO_SECTOR,1,(uint32_t)_fmi_ucBuffer);
                     break;
             }
             /* pointer to next image */
@@ -353,6 +353,6 @@ void GetMMCImage(void)
     if (count < 0)
         count = 0;
     MSG_DEBUG("count=%d,ReserveSpace=%d\n",count,*(unsigned int *)(pImageList+4));
-    usb_send(pImageList+8, count*(sizeof(FW_MMC_IMAGE_T)));
+    usb_send(pImageList+8, count*(sizeof(struct FW_MMC_IMAGE)));
     MSG_DEBUG("finish get mmc image [%d]!!\n", count);
 }

@@ -33,10 +33,10 @@ __align(0x4000) unsigned int _mmuSectionTable[4096];
 __align(1024) static _CTable _mmuCoarsePageTable[_CoarsePageSize]; 			// maximum 64MB for coarse pages
 __align(1024) static _CTable _mmuCoarsePageTable_NonCache[_CoarsePageSize];	// Shadow SDRAM area for non-cacheable 
 
-static BOOL _IsInitMMUTable = FALSE;
+static bool _IsInitMMUTable = false;
 static int _MMUMappingMode = MMU_DIRECT_MAPPING;
 
-extern INT32 sysGetSdramSizebyMB(void);
+extern int32_t sysGetSdramSizebyMB(void);
 extern void sysSetupCP15(unsigned int);
 
 
@@ -51,7 +51,7 @@ unsigned int sysGetPhyPageAddr(unsigned int vaddr)
 	else
 		PageTabPtr = (_CTable *) _mmuCoarsePageTable;	//cache-able virtual address
 		
-	if (sysGetCacheState() == TRUE)
+	if (sysGetCacheState() == true)
 		PageTabPtr = (_CTable *) ((unsigned int)PageTabPtr | 0x80000000); //If cache is enable, must write page tables directly into SDRAM		
 	
 	base_addr = vaddr & 0x7FFFF000;
@@ -78,11 +78,11 @@ int sysSetCachePages(unsigned int vaddr, int size, int cache_flag)
 	else
 		PageTabPtr = (_CTable *) _mmuCoarsePageTable;	//cache-able virtual address
 		
-	if (sysGetCacheState() == TRUE)
+	if (sysGetCacheState() == true)
 		PageTabPtr = (_CTable *) ((unsigned int)PageTabPtr | 0x80000000); //If cache is enable, must write page tables directly into SDRAM	
 	
 	vaddr &= 0x7FFFFFFF;	//ignore the non-cacheable bit 31	
-	//if ( _IsInitMMUTable == FALSE ) return -1;	
+	//if ( _IsInitMMUTable == false ) return -1;	
 	if ((vaddr + size) > (_CoarsePageSize << 20)) return -1;
 	
 	if (vaddr & 0xFFF) 	return -1;  /* MUST 4K Boundary */
@@ -128,10 +128,10 @@ int sysInitPageTable(unsigned int vaddr, unsigned int phy_addr, int size, int ca
 	else
 		PageTabPtr = (_CTable *) _mmuCoarsePageTable;	//cache-able virtual address
 		
-	if (sysGetCacheState() == TRUE)
+	if (sysGetCacheState() == true)
 		PageTabPtr = (_CTable *) ((unsigned int)PageTabPtr | 0x80000000); //If cache is enable, must write page tables directly into SDRAM		
 	
-	//if ( _IsInitMMUTable == FALSE ) return -1;	
+	//if ( _IsInitMMUTable == false ) return -1;	
 	vaddr &= 0x7FFFFFFF;	//ignore the non-cacheable bit 31
 	if ((vaddr + size) > (_CoarsePageSize << 20)) return -1;	
 	if (vaddr & 0xFFFFF) 	return -1;  /* MUST 1M Boundary */
@@ -192,7 +192,7 @@ int sysInitMMUTable(int cache_mode)
 	unsigned volatile int temp;
 	int i, size, ramsize;		
 	
-	if (_IsInitMMUTable == FALSE)		
+	if (_IsInitMMUTable == false)		
 	{
 		ramsize = sysGetSdramSizebyMB();
 		
@@ -262,7 +262,7 @@ int sysInitMMUTable(int cache_mode)
 			_mmuSectionTable[0x800+i] = temp;			
 		}
 										
-		_IsInitMMUTable = TRUE;
+		_IsInitMMUTable = true;
  	}
  	
  	//moved here by cmn [2007/01/27]

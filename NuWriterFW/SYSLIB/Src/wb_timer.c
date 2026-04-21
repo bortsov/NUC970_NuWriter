@@ -24,14 +24,15 @@
 #include "wblib.h"
 
 /* Global variables */
-PVOID  _sys_pvOldTimer0Vect, _sys_pvOldTimer1Vect;
-UINT32 _sys_uTimer0ClockRate = EXTERNAL_CRYSTAL_CLOCK;
-UINT32 _sys_uTimer1ClockRate = EXTERNAL_CRYSTAL_CLOCK;
-UINT32 volatile _sys_uTimer0Count = 0, _sys_uTimer1Count = 0;
-UINT32 volatile _sys_uTime0EventCount = 0, _sys_uTime1EventCount = 0;
-UINT32 volatile _sys_uTimer0TickPerSecond;
-BOOL   _sys_bIsSetTime0Event = FALSE, _sys_bIsSetTime1Event = FALSE;
-BOOL volatile _sys_bIsTimer0Initial = FALSE;
+void*  _sys_pvOldTimer0Vect;
+void* _sys_pvOldTimer1Vect;
+uint32_t _sys_uTimer0ClockRate = EXTERNAL_CRYSTAL_CLOCK;
+uint32_t _sys_uTimer1ClockRate = EXTERNAL_CRYSTAL_CLOCK;
+uint32_t volatile _sys_uTimer0Count = 0, _sys_uTimer1Count = 0;
+uint32_t volatile _sys_uTime0EventCount = 0, _sys_uTime1EventCount = 0;
+uint32_t volatile _sys_uTimer0TickPerSecond;
+bool   _sys_bIsSetTime0Event = false, _sys_bIsSetTime1Event = false;
+bool volatile _sys_bIsTimer0Initial = false;
 
 #define SECONDS_PER_HOUR	3600
 #define SECONDS_PER_DAY		86400
@@ -43,18 +44,18 @@ BOOL volatile _sys_bIsTimer0Initial = FALSE;
 typedef void (*sys_pvTimeFunPtr)();   /* function pointer */
 typedef struct timeEvent_t
 {
-	UINT32				active;
-	UINT32				initTick;
-	UINT32				curTick;
+	uint32_t				active;
+	uint32_t				initTick;
+	uint32_t				curTick;
 	sys_pvTimeFunPtr	funPtr;
 } TimeEvent_T;
 TimeEvent_T tTime0Event[TimerEventCount], tTime1Event[TimerEventCount];
 
 
-UINT32	volatile _sys_ReferenceTime_Clock = 0;
-UINT32	volatile _sys_ReferenceTime_UTC;
+uint32_t	volatile _sys_ReferenceTime_Clock = 0;
+uint32_t	volatile _sys_ReferenceTime_UTC;
 
-static UINT32 month_seconds[] = 
+static uint32_t month_seconds[] = 
 {
 	31 * SECONDS_PER_DAY, 
 	28 * SECONDS_PER_DAY, 
@@ -134,7 +135,7 @@ void sysTimer1ISR()
 
 
 /* Timer library functions */
-UINT32 sysGetTicks(INT32 nTimeNo)
+uint32_t sysGetTicks(int32_t nTimeNo)
 {
    switch (nTimeNo)
    {
@@ -150,7 +151,7 @@ UINT32 sysGetTicks(INT32 nTimeNo)
    return Successful;
 }
 
-INT32 sysResetTicks(INT32 nTimeNo)
+int32_t sysResetTicks(int32_t nTimeNo)
 {
    switch (nTimeNo)
    {
@@ -168,7 +169,7 @@ INT32 sysResetTicks(INT32 nTimeNo)
    return Successful;
 }
 
-INT32 sysUpdateTickCount(INT32 nTimeNo, UINT32 uCount)
+int32_t sysUpdateTickCount(int32_t nTimeNo, uint32_t uCount)
 {
    switch (nTimeNo)
    {
@@ -186,7 +187,7 @@ INT32 sysUpdateTickCount(INT32 nTimeNo, UINT32 uCount)
    return Successful;
 }
 
-INT32 sysSetTimerReferenceClock(INT32 nTimeNo, UINT32 uClockRate)
+int32_t sysSetTimerReferenceClock(int32_t nTimeNo, uint32_t uClockRate)
 {
    switch (nTimeNo)
    {
@@ -204,10 +205,10 @@ INT32 sysSetTimerReferenceClock(INT32 nTimeNo, UINT32 uClockRate)
    return Successful;
 }
 
-INT32 sysStartTimer(INT32 nTimeNo, UINT32 uTicksPerSecond, INT32 nOpMode)
+int32_t sysStartTimer(int32_t nTimeNo, uint32_t uTicksPerSecond, int32_t nOpMode)
 {
    int volatile i;
-   UINT32 _mTicr, _mTcr;
+   uint32_t _mTicr, _mTcr;
    
    _mTcr = 0x60000000 | (nOpMode << 27);
 
@@ -215,16 +216,16 @@ INT32 sysStartTimer(INT32 nTimeNo, UINT32 uTicksPerSecond, INT32 nOpMode)
    {
       case TIMER0:
       	   rPCLKEN0 |= 0x100;
-           _sys_bIsTimer0Initial = TRUE;
+           _sys_bIsTimer0Initial = true;
            _sys_uTimer0TickPerSecond = uTicksPerSecond;
       	   
            outpw(REG_TMR_TCSR0, 0);           /* disable timer */
            outpw(REG_TMR_TISR, 1);           /* clear for safty */
 
            for (i=0; i<TimerEventCount; i++)
-              tTime0Event[i].active = FALSE;
+              tTime0Event[i].active = false;
 
-           _sys_pvOldTimer0Vect = sysInstallISR(HIGH_LEVEL_SENSITIVE | IRQ_LEVEL_1, IRQ_TIMER0, (PVOID)sysTimer0ISR);
+           _sys_pvOldTimer0Vect = sysInstallISR(HIGH_LEVEL_SENSITIVE | IRQ_LEVEL_1, IRQ_TIMER0, (void*)sysTimer0ISR);
            sysEnableInterrupt(IRQ_TIMER0);
 
            _sys_uTimer0Count = 0;
@@ -239,9 +240,9 @@ INT32 sysStartTimer(INT32 nTimeNo, UINT32 uTicksPerSecond, INT32 nOpMode)
            outpw(REG_TMR_TISR, 2);           /* clear for safty */
 
            for (i=0; i<TimerEventCount; i++)
-              tTime1Event[i].active = FALSE;
+              tTime1Event[i].active = false;
 
-           _sys_pvOldTimer1Vect = sysInstallISR(HIGH_LEVEL_SENSITIVE | IRQ_LEVEL_1, IRQ_TIMER1, (PVOID)sysTimer1ISR);
+           _sys_pvOldTimer1Vect = sysInstallISR(HIGH_LEVEL_SENSITIVE | IRQ_LEVEL_1, IRQ_TIMER1, (void*)sysTimer1ISR);
            sysEnableInterrupt(IRQ_TIMER1);
 
            _sys_uTimer1Count = 0;
@@ -257,12 +258,12 @@ INT32 sysStartTimer(INT32 nTimeNo, UINT32 uTicksPerSecond, INT32 nOpMode)
    return Successful;
 }
 
-INT32 sysStopTimer(INT32 nTimeNo)
+int32_t sysStopTimer(int32_t nTimeNo)
 {
    switch (nTimeNo)
    {
       case TIMER0:
-           _sys_bIsTimer0Initial = FALSE;
+           _sys_bIsTimer0Initial = false;
            sysDisableInterrupt(IRQ_TIMER0);		   
            sysInstallISR(HIGH_LEVEL_SENSITIVE | IRQ_LEVEL_1, IRQ_TIMER0, _sys_pvOldTimer0Vect);
 
@@ -271,7 +272,7 @@ INT32 sysStopTimer(INT32 nTimeNo)
            outpw(REG_TMR_TISR, 1);           /* clear for safty */
 
            _sys_uTime0EventCount = 0;
-           _sys_bIsSetTime0Event = FALSE;
+           _sys_bIsSetTime0Event = false;
            break;
 
       case TIMER1:
@@ -283,7 +284,7 @@ INT32 sysStopTimer(INT32 nTimeNo)
            outpw(REG_TMR_TISR, 2);           /* clear for safty */
 
            _sys_uTime1EventCount = 0;
-           _sys_bIsSetTime1Event = FALSE;
+           _sys_bIsSetTime1Event = false;
            break;
 
       default:
@@ -295,7 +296,7 @@ INT32 sysStopTimer(INT32 nTimeNo)
 
 void sysClearWatchDogTimerCount()
 {
-   UINT32 volatile _mWtcr;
+   uint32_t volatile _mWtcr;
 
    _mWtcr = inpw(REG_WDT_CR);
    _mWtcr |= 0x01;             /* write WTR */
@@ -304,7 +305,7 @@ void sysClearWatchDogTimerCount()
 
 void sysClearWatchDogTimerInterruptStatus()
 {
-   UINT32 volatile _mWtcr;
+   uint32_t volatile _mWtcr;
 
    _mWtcr = inpw(REG_WDT_CR);
    _mWtcr |= 0x08;       /* clear WTIF */
@@ -314,7 +315,7 @@ void sysClearWatchDogTimerInterruptStatus()
 void sysDisableWatchDogTimer()
 {
 
-   UINT32 volatile _mWtcr;
+   uint32_t volatile _mWtcr;
 
    _mWtcr = inpw(REG_WDT_CR);
    _mWtcr &= 0xFFFFFF7F;
@@ -325,7 +326,7 @@ void sysDisableWatchDogTimer()
 void sysDisableWatchDogTimerReset()
 {
 
-   UINT32 volatile _mWtcr;
+   uint32_t volatile _mWtcr;
 
    _mWtcr = inpw(REG_WDT_CR);
    _mWtcr &= 0xFFFFFFFD;
@@ -336,7 +337,7 @@ void sysDisableWatchDogTimerReset()
 void sysEnableWatchDogTimer()
 {
 
-   UINT32 volatile _mWtcr;
+   uint32_t volatile _mWtcr;
 
    _mWtcr = inpw(REG_WDT_CR);
    _mWtcr |= 0x80;
@@ -347,7 +348,7 @@ void sysEnableWatchDogTimer()
 void sysEnableWatchDogTimerReset()
 {
 
-   UINT32 volatile _mWtcr;
+   uint32_t volatile _mWtcr;
 
    _mWtcr = inpw(REG_WDT_CR);
    _mWtcr |= 0x02;
@@ -355,10 +356,10 @@ void sysEnableWatchDogTimerReset()
   
 }
 
-PVOID sysInstallWatchDogTimerISR(INT32 nIntTypeLevel, PVOID pvNewISR)
+void* sysInstallWatchDogTimerISR(int32_t nIntTypeLevel, void* pvNewISR)
 {
-   PVOID _mOldVect = NULL;
-   UINT32 volatile _mWtcr;
+   void* _mOldVect = NULL;
+   uint32_t volatile _mWtcr;
 
    _mWtcr = inpw(REG_WDT_CR);
    _mWtcr |= 0x40;
@@ -370,10 +371,10 @@ PVOID sysInstallWatchDogTimerISR(INT32 nIntTypeLevel, PVOID pvNewISR)
    return _mOldVect;
 }
 
-INT32 sysSetWatchDogTimerInterval(INT32 nWdtInterval)
+int32_t sysSetWatchDogTimerInterval(int32_t nWdtInterval)
 {
 
-   UINT32 volatile _mWtcr;
+   uint32_t volatile _mWtcr;
 
    _mWtcr = inpw(REG_WDT_CR) & ~0x700;
    _mWtcr = _mWtcr | (nWdtInterval << 8);
@@ -383,7 +384,7 @@ INT32 sysSetWatchDogTimerInterval(INT32 nWdtInterval)
 }
 
 
-INT32 sysSetTimerEvent(INT32 nTimeNo, UINT32 uTimeTick, PVOID pvFun)
+int32_t sysSetTimerEvent(int32_t nTimeNo, uint32_t uTimeTick, void* pvFun)
 {
 	int volatile i;
 	int val=0;
@@ -391,13 +392,13 @@ INT32 sysSetTimerEvent(INT32 nTimeNo, UINT32 uTimeTick, PVOID pvFun)
 	switch (nTimeNo)
 	{
 		case TIMER0:
-			_sys_bIsSetTime0Event = TRUE;
+			_sys_bIsSetTime0Event = true;
 			_sys_uTime0EventCount++;
 			for (i=0; i<TimerEventCount; i++)
 			{
-				if (tTime0Event[i].active == FALSE)
+				if (tTime0Event[i].active == false)
 				{
-					tTime0Event[i].active = TRUE;
+					tTime0Event[i].active = true;
 					tTime0Event[i].initTick = uTimeTick;
 					tTime0Event[i].curTick = uTimeTick;
 					tTime0Event[i].funPtr = (sys_pvTimeFunPtr)pvFun;
@@ -408,13 +409,13 @@ INT32 sysSetTimerEvent(INT32 nTimeNo, UINT32 uTimeTick, PVOID pvFun)
 			break;
 
 		case TIMER1:
-			_sys_bIsSetTime1Event = TRUE;
+			_sys_bIsSetTime1Event = true;
 			_sys_uTime1EventCount++;
 			for (i=0; i<TimerEventCount; i++)
 			{
-				if (tTime1Event[i].active == FALSE)
+				if (tTime1Event[i].active == false)
 				{
-					tTime1Event[i].active = TRUE;
+					tTime1Event[i].active = true;
 					tTime1Event[i].initTick = uTimeTick;
 					tTime1Event[i].curTick = uTimeTick;
 					tTime1Event[i].funPtr = (sys_pvTimeFunPtr)pvFun;
@@ -431,22 +432,22 @@ INT32 sysSetTimerEvent(INT32 nTimeNo, UINT32 uTimeTick, PVOID pvFun)
 	return val;
 }
 
-void sysClearTimerEvent(INT32 nTimeNo, UINT32 uTimeEventNo)
+void sysClearTimerEvent(int32_t nTimeNo, uint32_t uTimeEventNo)
 {
 	switch (nTimeNo)
 	{
 		case TIMER0:
-			tTime0Event[uTimeEventNo-1].active = FALSE;
+			tTime0Event[uTimeEventNo-1].active = false;
 			_sys_uTime0EventCount--;
 			if (_sys_uTime0EventCount == 0)
-				_sys_bIsSetTime0Event = FALSE;
+				_sys_bIsSetTime0Event = false;
 			break;
 
 		case TIMER1:
-			tTime1Event[uTimeEventNo-1].active = FALSE;
+			tTime1Event[uTimeEventNo-1].active = false;
 			_sys_uTime1EventCount--;
 			if (_sys_uTime1EventCount == 0)
-				_sys_bIsSetTime1Event = FALSE;
+				_sys_bIsSetTime1Event = false;
 			break;
 
 		default:
@@ -462,10 +463,10 @@ void sysClearTimerEvent(INT32 nTimeNo, UINT32 uTimeEventNo)
  *  year 2005 = 31536000 * 35 + 8 * 86400 = 1104451200
  */
 
-UINT32 sysDOS_Time_To_UTC(DateTime_T ltime)
+uint32_t sysDOS_Time_To_UTC(DateTime_T ltime)
 {
 	int		i, leap_year_cnt;
-	UINT32	utc;
+	uint32_t	utc;
 	
 	if ((ltime.mon < 1) || (ltime.mon > 12) || (ltime.day < 1) || (ltime.day > 31) ||
 		(ltime.hour > 23) || (ltime.min > 59) || (ltime.sec > 59))
@@ -496,7 +497,7 @@ UINT32 sysDOS_Time_To_UTC(DateTime_T ltime)
 }
 
 
-void  sysUTC_To_DOS_Time(UINT32 utc, DateTime_T *dos_tm)
+void  sysUTC_To_DOS_Time(uint32_t utc, DateTime_T *dos_tm)
 {
 	int		the_year = 1970;
 	int		i, seconds;
@@ -554,7 +555,7 @@ void sysSetLocalTime(DateTime_T ltime)
 
 void sysGetCurrentTime(DateTime_T *curTime)
 {
-	UINT32 clock, utc_time;
+	uint32_t clock, utc_time;
 
 	clock = _sys_uTimer0Count;
 	utc_time = _sys_ReferenceTime_UTC + (clock - _sys_ReferenceTime_Clock) / _sys_uTimer0TickPerSecond;
@@ -563,9 +564,9 @@ void sysGetCurrentTime(DateTime_T *curTime)
 }
 
 
-void sysDelay(UINT32 uTicks)
+void sysDelay(uint32_t uTicks)
 {
-    UINT32 volatile btime;
+    uint32_t volatile btime;
 
     if(!_sys_bIsTimer0Initial)
     {

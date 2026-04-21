@@ -29,14 +29,14 @@
 #define WB_NUM_OF_AICREG   		16
 
 /* Global variables */
-BOOL volatile _sys_bIsAICInitial = FALSE;
-BOOL volatile _sys_bIsHWMode = TRUE;
+bool volatile _sys_bIsAICInitial = false;
+bool volatile _sys_bIsHWMode = true;
 
 /* declaration the function prototype */
 extern void WB_Interrupt_Shell(void);
 
 /* Define AIC source control register address */
-UINT32 WB_AICRegAddr[WB_NUM_OF_AICREG] = {
+uint32_t WB_AICRegAddr[WB_NUM_OF_AICREG] = {
 				REG_AIC_SCR1,		REG_AIC_SCR2,		REG_AIC_SCR3,		REG_AIC_SCR4,
 				REG_AIC_SCR5,		REG_AIC_SCR6,		REG_AIC_SCR7,		REG_AIC_SCR8,								
 				REG_AIC_SCR9,		REG_AIC_SCR10,	REG_AIC_SCR11,	REG_AIC_SCR12,
@@ -168,7 +168,7 @@ __irq void sysIrqHandler()
 {
 	if (_sys_bIsHWMode)
 	{
-		UINT32 volatile _mIPER, _mISNR;
+		uint32_t volatile _mIPER, _mISNR;
 
 		_mIPER = (inpw(REG_AIC_IPER) >> 2) & 0x3f;
 		_mISNR = inpw(REG_AIC_ISNR);
@@ -179,7 +179,7 @@ __irq void sysIrqHandler()
 	}
 	else
 	{
-		UINT32 volatile _mISR, _mISRH, i;
+		uint32_t volatile _mISR, _mISRH, i;
 
 		_mISR = inpw(REG_AIC_ISR);
 		_mISRH = inpw(REG_AIC_ISRH);
@@ -198,7 +198,7 @@ __irq void sysFiqHandler()
 {
 	if (_sys_bIsHWMode)
 	{
-		UINT32 volatile _mIPER, _mISNR;
+		uint32_t volatile _mIPER, _mISNR;
   
 		_mIPER = (inpw(REG_AIC_IPER) >> 2) & 0x3f;
 		_mISNR = inpw(REG_AIC_ISNR);
@@ -210,7 +210,7 @@ __irq void sysFiqHandler()
 	}
 	else
 	{
-		UINT32 volatile _mISR, _mISRH, i;
+		uint32_t volatile _mISR, _mISRH, i;
 
 		_mISR = inpw(REG_AIC_ISR);
 		_mISRH = inpw(REG_AIC_ISRH);
@@ -232,18 +232,18 @@ void WB_Interrupt_Shell()
 
 void sysInitializeAIC()
 {
-//	PVOID _mOldIrqVect, _mOldFiqVect;
+//	void* _mOldIrqVect, _mOldFiqVect;
 
-//	_mOldIrqVect = *(PVOID volatile *)0x38;
-	*(PVOID volatile *)0x38 = (PVOID volatile)sysIrqHandler;
+//	_mOldIrqVect = *(void* volatile *)0x38;
+	*(void* volatile *)0x38 = (void* volatile)sysIrqHandler;
 
-//	_mOldFiqVect = *(PVOID volatile *)0x3C;
-	*(PVOID volatile *)0x3C = (PVOID volatile)sysFiqHandler;
+//	_mOldFiqVect = *(void* volatile *)0x3C;
+	*(void* volatile *)0x3C = (void* volatile)sysFiqHandler;
 }
 
 
 /* Interrupt library functions */
-INT32 sysDisableInterrupt(INT_SOURCE_E eIntNo)
+int32_t sysDisableInterrupt(INT_SOURCE_E eIntNo)
 {
 	if ((eIntNo > WB_MAX_INT_SOURCE) || (eIntNo < WB_MIN_INT_SOURCE))
 		return Fail;
@@ -257,7 +257,7 @@ INT32 sysDisableInterrupt(INT_SOURCE_E eIntNo)
 }
 
 
-INT32 sysEnableInterrupt(INT_SOURCE_E eIntNo)
+int32_t sysEnableInterrupt(INT_SOURCE_E eIntNo)
 {
    if ((eIntNo > WB_MAX_INT_SOURCE) || (eIntNo < WB_MIN_INT_SOURCE))
 	  return Fail;
@@ -271,30 +271,30 @@ INT32 sysEnableInterrupt(INT_SOURCE_E eIntNo)
 }
 
 
-PVOID sysInstallExceptionHandler(INT32 nExceptType, PVOID pvNewHandler)
+void* sysInstallExceptionHandler(int32_t nExceptType, void* pvNewHandler)
 {
-   PVOID _mOldVect;
+   void* _mOldVect;
    
    switch (nExceptType)
    {
 	  case WB_SWI:
-		   _mOldVect = *(PVOID volatile *)0x28;
-		   *(PVOID volatile *)0x28 = pvNewHandler;
+		   _mOldVect = *(void* volatile *)0x28;
+		   *(void* volatile *)0x28 = pvNewHandler;
 		   break;
 
 	  case WB_D_ABORT:
-		   _mOldVect = *(PVOID volatile *)0x30;
-		   *(PVOID volatile *)0x30 = pvNewHandler;
+		   _mOldVect = *(void* volatile *)0x30;
+		   *(void* volatile *)0x30 = pvNewHandler;
 		   break;
 
 	  case WB_I_ABORT:
-		   _mOldVect = *(PVOID volatile *)0x2C;
-		   *(PVOID volatile *)0x2C = pvNewHandler;
+		   _mOldVect = *(void* volatile *)0x2C;
+		   *(void* volatile *)0x2C = pvNewHandler;
 		   break;
 
 	  case WB_UNDEFINE:
-		   _mOldVect = *(PVOID volatile *)0x24;
-		   *(PVOID volatile *)0x24 = pvNewHandler;
+		   _mOldVect = *(void* volatile *)0x24;
+		   *(void* volatile *)0x24 = pvNewHandler;
 		   break;
 
 	  default:
@@ -303,35 +303,35 @@ PVOID sysInstallExceptionHandler(INT32 nExceptType, PVOID pvNewHandler)
    return _mOldVect;
 }
 
-PVOID sysInstallFiqHandler(PVOID pvNewISR)
+void* sysInstallFiqHandler(void* pvNewISR)
 {
-	PVOID _mOldVect;
+	void* _mOldVect;
    
-	_mOldVect = *(PVOID volatile *)0x3C;
-	*(PVOID volatile *)0x3C = pvNewISR;
+	_mOldVect = *(void* volatile *)0x3C;
+	*(void* volatile *)0x3C = pvNewISR;
 	return _mOldVect;
 }
 
-PVOID sysInstallIrqHandler(PVOID pvNewISR)
+void* sysInstallIrqHandler(void* pvNewISR)
 {
-	PVOID _mOldVect;
+	void* _mOldVect;
    
-	_mOldVect = *(PVOID volatile *)0x38;
-	*(PVOID volatile *)0x38 = pvNewISR;
+	_mOldVect = *(void* volatile *)0x38;
+	*(void* volatile *)0x38 = pvNewISR;
 	return _mOldVect;
 }
 
 
-PVOID sysInstallISR(INT32 nIntTypeLevel, INT_SOURCE_E eIntNo, PVOID pvNewISR)
+void* sysInstallISR(int32_t nIntTypeLevel, INT_SOURCE_E eIntNo, void* pvNewISR)
 {
-	PVOID  	_mOldVect;
-	UINT32 	_mRegAddr/*, _mRegValue*/;
-	INT		shift;
+	void*  	_mOldVect;
+	uint32_t 	_mRegAddr/*, _mRegValue*/;
+	int		shift;
 
 	if (!_sys_bIsAICInitial)
 	{
 		sysInitializeAIC();
-		_sys_bIsAICInitial = TRUE;
+		_sys_bIsAICInitial = true;
 	}
    
 	_mRegAddr = REG_AIC_SCR1 + ((eIntNo / 4) * 4); 
@@ -341,19 +341,19 @@ PVOID sysInstallISR(INT32 nIntTypeLevel, INT_SOURCE_E eIntNo, PVOID pvNewISR)
 
 	if ((nIntTypeLevel & 0x7) == FIQ_LEVEL_0)
 	{
-		_mOldVect = (PVOID) sysFiqHandlerTable[eIntNo];
+		_mOldVect = (void*) sysFiqHandlerTable[eIntNo];
 		sysFiqHandlerTable[eIntNo] = (sys_pvFunPtr)pvNewISR;
 	}
 	else
 	{
-	   _mOldVect = (PVOID) sysIrqHandlerTable[eIntNo];
+	   _mOldVect = (void*) sysIrqHandlerTable[eIntNo];
 	   sysIrqHandlerTable[eIntNo] = (sys_pvFunPtr)pvNewISR;
 	}
    	return _mOldVect;
 }
 
 
-INT32 sysSetGlobalInterrupt(INT32 nIntState)
+int32_t sysSetGlobalInterrupt(int32_t nIntState)
 {
    switch (nIntState)
    {
@@ -374,10 +374,10 @@ INT32 sysSetGlobalInterrupt(INT32 nIntState)
 }
 
 
-INT32 sysSetInterruptPriorityLevel(INT_SOURCE_E eIntNo, UINT32 uIntLevel)
+int32_t sysSetInterruptPriorityLevel(INT_SOURCE_E eIntNo, uint32_t uIntLevel)
 {
-   	UINT32 	_mRegAddr/*, _mRegValue*/;
-   	INT		shift;
+   	uint32_t 	_mRegAddr/*, _mRegValue*/;
+   	int		shift;
 
    if ((eIntNo > WB_MAX_INT_SOURCE) || (eIntNo < WB_MIN_INT_SOURCE))
 	  return Fail;
@@ -391,10 +391,10 @@ INT32 sysSetInterruptPriorityLevel(INT_SOURCE_E eIntNo, UINT32 uIntLevel)
 }
 
 
-INT32 sysSetInterruptType(INT_SOURCE_E eIntNo, UINT32 uIntSourceType)
+int32_t sysSetInterruptType(INT_SOURCE_E eIntNo, uint32_t uIntSourceType)
 {
-   	UINT32 _mRegAddr/*, _mRegValue*/;
-   	INT		shift;
+   	uint32_t _mRegAddr/*, _mRegValue*/;
+   	int		shift;
 
    	if ((eIntNo > WB_MAX_INT_SOURCE) || (eIntNo < WB_MIN_INT_SOURCE))
 	  	return Fail;
@@ -408,9 +408,9 @@ INT32 sysSetInterruptType(INT_SOURCE_E eIntNo, UINT32 uIntSourceType)
 }
 
 
-INT32 sysSetLocalInterrupt(INT32 nIntState)
+int32_t sysSetLocalInterrupt(int32_t nIntState)
 {
-   INT32 temp;
+   int32_t temp;
 
    switch (nIntState)
    {
@@ -442,28 +442,28 @@ INT32 sysSetLocalInterrupt(INT32 nIntState)
    return Successful;
 }
 
-INT32 sysSetAIC2SWMode()
+int32_t sysSetAIC2SWMode()
 {
-	_sys_bIsHWMode = FALSE;
+	_sys_bIsHWMode = false;
 	return Successful;
 }
 
 
-UINT32	sysGetInterruptEnableStatus(void)
+uint32_t	sysGetInterruptEnableStatus(void)
 {
 	return (inpw(REG_AIC_IMR));
 }
 
 
-UINT32	sysGetInterruptEnableStatusH(void)
+uint32_t	sysGetInterruptEnableStatusH(void)
 {
 	return (inpw(REG_AIC_IMRH));
 }
 
 
-BOOL sysGetIBitState()
+bool sysGetIBitState()
 {
-	INT32 temp;
+	int32_t temp;
 
 	__asm
 	{
@@ -471,9 +471,9 @@ BOOL sysGetIBitState()
 	}
 
 	if (temp & 0x80)
-		return FALSE;
+		return false;
 	else
-		return TRUE;
+		return true;
 }
 
 

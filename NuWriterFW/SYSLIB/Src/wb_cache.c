@@ -22,13 +22,13 @@
  **************************************************************************/
 #include "wblib.h"
 
-BOOL volatile _sys_IsCacheOn = FALSE;
-INT32 volatile _sys_CacheMode;
+bool volatile _sys_IsCacheOn = false;
+int32_t volatile _sys_CacheMode;
 extern void sys_flush_and_clean_dcache(void);
 extern int sysInitMMUTable(int);
 
 
-INT32 sysGetSdramSizebyMB()
+int32_t sysGetSdramSizebyMB()
 {
 	unsigned int volatile reg, totalsize=0;
 
@@ -95,10 +95,10 @@ INT32 sysGetSdramSizebyMB()
 }
 
 
-INT32 sysEnableCache(UINT32 uCacheOpMode)
+int32_t sysEnableCache(uint32_t uCacheOpMode)
 {
 	sysInitMMUTable(uCacheOpMode);
-	_sys_IsCacheOn = TRUE;
+	_sys_IsCacheOn = true;
 	_sys_CacheMode = uCacheOpMode;
 	
 	return 0;
@@ -122,12 +122,12 @@ void sysDisableCache()
 		BIC	temp, temp, 0x01
 		MCR p15, 0, temp, c1, c0, 0 	/* write Control register */
 	}
-	_sys_IsCacheOn = FALSE;
+	_sys_IsCacheOn = false;
 	_sys_CacheMode = CACHE_DISABLE;
 	
 }
 
-void sysFlushCache(INT32 nCacheType)
+void sysFlushCache(int32_t nCacheType)
 {
 	int temp;
 
@@ -179,19 +179,19 @@ void sysInvalidCache()
 	}
 }
 
-BOOL sysGetCacheState()
+bool sysGetCacheState()
 {
 	return _sys_IsCacheOn;
 }
 
 
-INT32 sysGetCacheMode()
+int32_t sysGetCacheMode()
 {
 	return _sys_CacheMode;
 }
 
 
-INT32 _sysLockCode(UINT32 addr, INT32 size)
+int32_t _sysLockCode(uint32_t addr, int32_t size)
 {
 	int i, cnt, temp;
 		
@@ -231,7 +231,7 @@ INT32 _sysLockCode(UINT32 addr, INT32 size)
 }
 
 
-INT32 _sysUnLockCode()
+int32_t _sysUnLockCode()
 {
 	int temp;
 	

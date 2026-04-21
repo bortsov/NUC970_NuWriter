@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include "wblib.h"
 
-#define vaStart(list, param) list = (INT8*)((INT)&param + sizeof(param))
+#define vaStart(list, param) list = (int8_t*)((int)&param + sizeof(param))
 #define vaArg(list, type) ((type *)(list += sizeof(type)))[-1]
 
 typedef struct
@@ -51,7 +51,7 @@ typedef struct
 #define UART0	   ((UART_TypeDef *)UART0_BA) 
 
 
-INT32 sysInitializeUART()
+int32_t sysInitializeUART()
 {
 	/* enable UART0 clock */
 	//outpw(REG_CLKEN, inpw(REG_CLKEN) | 0x10000);
@@ -67,7 +67,7 @@ INT32 sysInitializeUART()
 }
 
 
-void _PutChar_f(UINT8 ch)
+void _PutChar_f(uint8_t ch)
 {
 	volatile int loop;	
 	while ((UART0->FSR & (1<<23))); //waits for TX_FULL bit is clear
@@ -80,7 +80,7 @@ void _PutChar_f(UINT8 ch)
 }
 
 
-void sysPutString(INT8 *string)
+void sysPutString(int8_t *string)
 {
 	while (*string != '\0')
 	{
@@ -90,28 +90,28 @@ void sysPutString(INT8 *string)
 }
 
 
-static void sysPutRepChar(INT8 c, INT count)
+static void sysPutRepChar(int8_t c, int count)
 {
 	while (count--)
 		_PutChar_f(c);
 }
 
 
-static void sysPutStringReverse(INT8 *s, INT index)
+static void sysPutStringReverse(int8_t *s, int index)
 {
 	while ((index--) > 0)
 		_PutChar_f(s[index]);
 }
 
 
-static void sysPutNumber(INT value, INT radix, INT width, INT8 fill)
+static void sysPutNumber(int value, int radix, int width, int8_t fill)
 {
-	INT8    buffer[40];
-	INT     bi = 0;
-	UINT32  uvalue;
-	UINT16  digit;
-	UINT16  left = FALSE;
-	UINT16  negative = FALSE;
+	int8_t    buffer[40];
+	int     bi = 0;
+	uint32_t  uvalue;
+	uint16_t  digit;
+	uint16_t  left = false;
+	uint16_t  negative = false;
 
 	if (fill == 0)
 		fill = ' ';
@@ -119,7 +119,7 @@ static void sysPutNumber(INT value, INT radix, INT width, INT8 fill)
 	if (width < 0)
 	{
 		width = -width;
-		left = TRUE;
+		left = true;
 	}
 
 	if (width < 0 || width > 80)
@@ -130,7 +130,7 @@ static void sysPutNumber(INT value, INT radix, INT width, INT8 fill)
 		radix = -radix;
 		if (value < 0)
 		{
-			negative = TRUE;
+			negative = true;
 			value = -value;
 		}
 	}
@@ -183,13 +183,13 @@ static void sysPutNumber(INT value, INT radix, INT width, INT8 fill)
 }
 
 
-static INT8 *FormatItem(INT8 *f, INT a)
+static int8_t *FormatItem(int8_t *f, int a)
 {
-	INT8   c;
-	INT    fieldwidth = 0;
-	INT    leftjust = FALSE;
-	INT    radix = 0;
-	INT8   fill = ' ';
+	int8_t   c;
+	int    fieldwidth = 0;
+	int    leftjust = false;
+	int    radix = 0;
+	int8_t   fill = ' ';
 
 	if (*f == '0')
 		fill = '0';
@@ -209,7 +209,7 @@ static INT8 *FormatItem(INT8 *f, INT a)
 					_PutChar_f('%');
 					return (f);
 				case '-':
-					leftjust = TRUE;
+					leftjust = true;
 					break;
 				case 'c':
 					{
@@ -226,13 +226,13 @@ static INT8 *FormatItem(INT8 *f, INT a)
 				case 's':
 					{
 						if (leftjust)
-							sysPutString((PINT8)a);
+							sysPutString((int8_t*)a);
 
-						if (fieldwidth > strlen((PINT8)a))
-							sysPutRepChar(fill, fieldwidth - strlen((PINT8)a));
+						if (fieldwidth > strlen((int8_t*)a))
+							sysPutRepChar(fill, fieldwidth - strlen((int8_t*)a));
 
 						if (!leftjust)
-							sysPutString((PINT8)a);
+							sysPutString((int8_t*)a);
 						return (f);
 					}
 				case 'd':
@@ -268,22 +268,22 @@ static INT8 *FormatItem(INT8 *f, INT a)
 }
 
 
-void sysprintf(PINT8 pcStr,...)
+void sysprintf(int8_t* pcStr,...)
 {
-	INT8  *argP;
+	int8_t  *argP;
 	
 	vaStart(argP, pcStr);       /* point at the end of the format string */
 	while (*pcStr)
 	{                       /* this works because args are all ints */
 		if (*pcStr == '%')
-			pcStr = FormatItem(pcStr + 1, vaArg(argP, INT));
+			pcStr = FormatItem(pcStr + 1, vaArg(argP, int));
 		else
 			_PutChar_f(*pcStr++);
 	}
 }
 
 
-INT8 sysGetChar()
+int8_t sysGetChar()
 {
 	int i;
 	while (1)
@@ -296,7 +296,7 @@ INT8 sysGetChar()
 	}
 }
 
-void sysPutChar(UINT8 ucCh)
+void sysPutChar(uint8_t ucCh)
 {
 	volatile int loop;
 	while ((UART0->FSR & (1<<23))); //waits for TX_FULL bit is clear

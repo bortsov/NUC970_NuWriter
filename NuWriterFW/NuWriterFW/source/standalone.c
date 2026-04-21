@@ -29,10 +29,10 @@ void _ttywrch(int ch)
     char tempch = (char)ch;
     (void)tempch;
 }
-#if 1
-__value_in_regs struct R0_R3 {unsigned heap_base, stack_base, heap_limit, stack_limit;} 
-    __user_setup_stackheap(unsigned int R0, unsigned int SP, unsigned int R2, unsigned int SL)
 
+__value_in_regs struct R0_R3 {unsigned heap_base, stack_base, heap_limit, stack_limit;} 
+
+__user_setup_stackheap(unsigned int R0, unsigned int SP, unsigned int R2, unsigned int SL)
 {
 
     struct R0_R3 config;
@@ -44,5 +44,4 @@ __value_in_regs struct R0_R3 {unsigned heap_base, stack_base, heap_limit, stack_
 
     return config;
 }
-#endif
 /* end of file standalone.c */

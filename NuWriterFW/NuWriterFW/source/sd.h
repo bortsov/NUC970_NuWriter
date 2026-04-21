@@ -7,24 +7,15 @@
  *
  * $Author: schung $
  ******************************************************************************/
- #ifndef __SD_H__
- #define __SD_H__
+#pragma once
 
-#include "wbio.h"
-#include "stdio.h"
-#include <stdio.h>
-#include "nuc970_reg.h"
 #include "fmi.h"
+#include "wblib.h"
 
-#define SD_CARD             0
 #define SD_ERR_ID           0xFFFF0100
 
 #define SD_TIMEOUT          (SD_ERR_ID|0x01)
 #define SD_NO_MEMORY        (SD_ERR_ID|0x02)
-
-//-- function return value
-#define    Successful       0
-#define    Fail             1
 
 //--- define type of SD card or MMC
 #define SD_TYPE_UNKNOWN     0
@@ -107,25 +98,8 @@
 #define SD_ISR_DATA1        ((unsigned int)0x00040000)
 
 
-/********************************************************/
-#if 0
-typedef struct SD_info_t
-{
-    UINT32  CardType;       // sd2.0, sd1.1, or mmc
-    UINT32  RCA;            // relative card address
-    UINT8   bIsCardInsert;
-}SD_INFO_T;
-
-extern SD_INFO_T *pSD0;
-extern SD_INFO_T *pSD1;
-#endif
-/* extern function */
-
-
-//#define SD_FREQ       24000
 #define SD_FREQ     12000
 
-//#define SDHC_FREQ 50000
 #define SDHC_FREQ   12000
 
 
@@ -134,46 +108,24 @@ extern SD_INFO_T *pSD1;
 //*******************************************************
 
 // extern global variables
-extern UINT32 _sd_ReferenceClock;
-extern UINT8 volatile _sd_SDDataReady;
-
-//#define STOR_STRING_LEN   32
-
-#if 0
-/* we allocate one of these for every device that we remember */
-typedef struct disk_data_t
-{
-    struct disk_data_t  *next;           /* next device */
-
-    /* information about the device -- always good */
-    unsigned int  totalSectorN;
-    unsigned int  diskSize;         /* disk size in Kbytes */
-    int           sectorSize;
-    char          vendor[STOR_STRING_LEN];
-    char          product[STOR_STRING_LEN];
-    char          serial[STOR_STRING_LEN];
-} DISK_DATA_T;
-#endif
+extern uint32_t _sd_ReferenceClock;
+extern uint8_t volatile _sd_SDDataReady;
 
 // function declaration
 
 // SD functions
-int  SD_Command(FMI_SD_INFO_T *pSD, UINT8 ucCmd, UINT32 uArg);
-int  SD_CmdAndRsp(FMI_SD_INFO_T *pSD, UINT8 ucCmd, UINT32 uArg, int nCount);
-int  SD_CmdAndRsp2(FMI_SD_INFO_T *pSD, UINT8 ucCmd, UINT32 uArg, UINT32 *puR2ptr);
-int  SD_CmdAndRspDataIn(FMI_SD_INFO_T *pSD, UINT8 ucCmd, UINT32 uArg);
-int  SD_SelectCardType(FMI_SD_INFO_T *pSD);
-void SD_Get_SD_info(FMI_SD_INFO_T *pSD, DISK_DATA_T *_info);
-int  SD_Read_in(FMI_SD_INFO_T *pSD, UINT32 uSector, UINT32 uBufcnt, UINT32 uDAddr);
-int  SD_Write_in(FMI_SD_INFO_T *pSD, UINT32 uSector, UINT32 uBufcnt, UINT32 uSAddr);
+int  SD_Command(struct FMI_SD_INFO *pSD, uint8_t ucCmd, uint32_t uArg);
+int  SD_CmdAndRsp(struct FMI_SD_INFO *pSD, uint8_t ucCmd, uint32_t uArg, int nCount);
+int  SD_CmdAndRsp2(struct FMI_SD_INFO *pSD, uint8_t ucCmd, uint32_t uArg, uint32_t *puR2ptr);
+int  SD_CmdAndRspDataIn(struct FMI_SD_INFO *pSD, uint8_t ucCmd, uint32_t uArg);
+int  SD_SelectCardType(struct FMI_SD_INFO *pSD);
+void SD_Get_SD_info(struct FMI_SD_INFO *pSD, struct DISK_DATA *_info);
+int  SD_Read_in(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufcnt, uint32_t uDAddr);
+int  SD_Write_in(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufcnt, uint32_t uSAddr);
 void SD_CheckRB(void);
-void SD_SetReferenceClock(UINT32 uClock);
-void SD_Set_clock(UINT32 sd_clock_khz);
+void SD_SetReferenceClock(uint32_t uClock);
+void SD_Set_clock(uint32_t sd_clock_khz);
 void SD_CardSelect(int cardSel);
-int SD_Init(FMI_SD_INFO_T *pSD);
+int SD_Init(struct FMI_SD_INFO *pSD);
 void SD_Show_info(int sdport);
-int  SD_Read_in_blksize(FMI_SD_INFO_T *pSD, UINT32 uSector, UINT32 uBufcnt, UINT32 uDAddr, UINT32 blksize);
-
-//*******************************************************
-
- #endif /* END __SD_H__ */
+int  SD_Read_in_blksize(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufcnt, uint32_t uDAddr, uint32_t blksize);

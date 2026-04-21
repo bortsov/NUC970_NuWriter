@@ -23,9 +23,9 @@
 #include <stdio.h>
 #include "wblib.h"
 
-INT32 sysSetExternalIO(INT extNo, UINT32 extBaseAddr, UINT32 extSize, INT extBusWidth)
+int32_t sysSetExternalIO(int extNo, uint32_t extBaseAddr, uint32_t extSize, int extBusWidth)
 {
-    UINT32 volatile reg, extiobase;
+    uint32_t volatile reg, extiobase;
 
 	switch (extNo)
 	{
@@ -117,9 +117,9 @@ INT32 sysSetExternalIO(INT extNo, UINT32 extBaseAddr, UINT32 extSize, INT extBus
     return Successful;	
 }
 
-INT32 sysSetExternalIOTiming1(INT extNo, INT tACC, INT tACS)
+int32_t sysSetExternalIOTiming1(int extNo, int tACC, int tACS)
 {
-    UINT32 volatile reg, extiobase;
+    uint32_t volatile reg, extiobase;
 
 	switch (extNo)
 	{
@@ -160,9 +160,9 @@ INT32 sysSetExternalIOTiming1(INT extNo, INT tACC, INT tACS)
          
 }
 
-INT32 sysSetExternalIOTiming2(INT extNo, INT tCOH, INT tCOS)
+int32_t sysSetExternalIOTiming2(int extNo, int tCOH, int tCOS)
 {
-    UINT32 volatile reg, extiobase;
+    uint32_t volatile reg, extiobase;
 
 	switch (extNo)
 	{

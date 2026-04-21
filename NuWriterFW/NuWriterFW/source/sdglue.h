@@ -7,30 +7,29 @@
  *
  * $Author: schung $
  ******************************************************************************/
-#ifndef __SDGLUE_H__
-#define __SDGLUE_H__
+#pragma once
 
-#include "wbtypes.h"
+#include <stdint.h>
+
 #include "sd.h"
 
 #define SD_SECTOR 512
 #define SD_MUL 8
 #define MMC_INFO_SECTOR 1
 
-INT  fmiInitSDDevice(void);
-INT  fmiSD_Read(UINT32 uSector, UINT32 uBufcnt, UINT32 uDAddr);
-INT  fmiSD_Write(UINT32 uSector, UINT32 uBufcnt, UINT32 uSAddr);
+int  fmiInitSDDevice(void);
+int  fmiSD_Read(uint32_t uSector, uint32_t uBufcnt, uint32_t uDAddr);
+int  fmiSD_Write(uint32_t uSector, uint32_t uBufcnt, uint32_t uSAddr);
 
 
-void Burn_MMC_RAW(UINT32 len, UINT32 offset,UINT8 *ptr);
-void Read_MMC_RAW(UINT32 len, UINT32 offset,UINT8 *ptr);
+void Burn_MMC_RAW(uint32_t len, uint32_t offset,uint8_t *ptr);
+void Read_MMC_RAW(uint32_t len, uint32_t offset,uint8_t *ptr);
 
 
 //------------------------------------------------------------------
-int ChangeMMCImageType(UINT32 imageNo, UINT32 imageType);
-int SetMMCImageInfo(FW_MMC_IMAGE_T *mmcImageInfo);
-UINT32 GetMMCImageInfo(unsigned int *image);
-UINT32 GetMMCReserveSpace(void);
+int ChangeMMCImageType(uint32_t imageNo, uint32_t imageType);
+int SetMMCImageInfo(struct FW_MMC_IMAGE *mmcImageInfo);
+uint32_t GetMMCImageInfo(unsigned int *image);
+uint32_t GetMMCReserveSpace(void);
 void GetMMCImage(void);
-int DelMMCImage(UINT32 imageNo);
-#endif
+int DelMMCImage(uint32_t imageNo);

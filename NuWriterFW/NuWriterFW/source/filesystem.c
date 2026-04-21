@@ -17,9 +17,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SectorSize 512
 #define WriteLen  512
-static UINT8 bpb_sample[]= {
+
+#define PUT16_L(bptr,n,val)	bptr[n] = val & 0xFF;	bptr[n+1] = (val >> 8) & 0xFF;
+#define PUT32_L(bptr,n,val)	bptr[n] = val & 0xFF;	bptr[n+1] = (val >> 8) & 0xFF; bptr[n+2] = (val >> 16) & 0xFF; bptr[n+3] = (val >> 24) & 0xFF;
+
+static void MBR_DecodingCHS(uint32_t PartitionSize, uint32_t *CIdx, uint32_t *TIdx, uint32_t *SIdx);
+static int fmiSDWrite(uint32_t uStartSecN,uint32_t nCount,uint8_t *pucSecBuff);
+
+static uint8_t bpb_sample[]= {
     0xEB, 0x58, 0x90, 0x4D, 0x53, 0x44, 0x4F, 0x53, 0x35, 0x2E, 0x30, 0x00, 0x02, 0x08, 0x22, 0x00,
     0x02, 0x00, 0x00, 0x00, 0x00, 0xF8, 0x00, 0x00, 0x3F, 0x00, 0xFF, 0x00, 0x3F, 0x00, 0x00, 0x00,
     0xC1, 0x0F, 0x2F, 0x00, 0xBF, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
@@ -53,22 +59,20 @@ static UINT8 bpb_sample[]= {
     0x61, 0x6E, 0x79, 0x20, 0x6B, 0x65, 0x79, 0x20, 0x74, 0x6F, 0x20, 0x72, 0x65, 0x73, 0x74, 0x61,
     0x72, 0x74, 0x0D, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAC, 0xCB, 0xD8, 0x00, 0x00, 0x55, 0xAA
 };
-//__align(32) UINT8 g_MemBuff[256*1024]; 
-#define get_timer_ticks()		sysGetTicks(TIMER0)
 
-INT fmiSDWrite(UINT32 uStartSecN,UINT32 nCount,UINT8 *pucSecBuff)
+static int fmiSDWrite(uint32_t uStartSecN,uint32_t nCount,uint8_t *pucSecBuff)
 {
-    fmiSD_Write(uStartSecN, nCount, (UINT32)pucSecBuff);
+    fmiSD_Write(uStartSecN, nCount, (uint32_t)pucSecBuff);
     return 1;
 }
 
-void fsFreeSector(UINT8 *buff){;}
+void fsFreeSector(uint8_t *buff){}
 
-void MBR_DecodingCHS(UINT32 PartitionSize, UINT32 *CIdx, UINT32 *TIdx, UINT32 *SIdx)
+static void MBR_DecodingCHS(uint32_t PartitionSize, uint32_t *CIdx, uint32_t *TIdx, uint32_t *SIdx)
 {
-    UINT32 u32Sector, u32Track, u32Cylinder;//, u32CHSValue;
-    UINT32 u32CHS_S, u32CHS_T, u32CHS_C;
-    UINT32 u32tempS, u32tempC;
+    uint32_t u32Sector, u32Track, u32Cylinder;//, u32CHSValue;
+    uint32_t u32CHS_S, u32CHS_T, u32CHS_C;
+    uint32_t u32tempS, u32tempC;
 
     /*
         1 sector = 512 bytes
@@ -106,14 +110,14 @@ void MBR_DecodingCHS(UINT32 PartitionSize, UINT32 *CIdx, UINT32 *TIdx, UINT32 *S
     TotalSize(sectors) : total sector size in the Device
     myPmmcImage        : MMC struct
 */
-PMBR create_mbr(UINT32 TotalSecSize, FW_MMC_IMAGE_T *myPmmcImage)
+struct MBR* create_mbr(uint32_t TotalSecSize, struct FW_MMC_IMAGE *myPmmcImage)
 {
-    UINT32 paraCIdx=0, paraTIdx=0, paraSIdx=0;
-    UINT32 TotalSize=0, tmpRemainSectorSize = 0, tmpRemainSize;
-    PMBR mbr=NULL;
-    mbr=(PMBR)malloc(sizeof(MBR));
+    uint32_t paraCIdx=0, paraTIdx=0, paraSIdx=0;
+    uint32_t TotalSize=0, tmpRemainSectorSize = 0, tmpRemainSize;
+    struct MBR* mbr=NULL;
+    mbr=(struct MBR*)malloc(sizeof(struct MBR));
     if(mbr==NULL) return NULL;
-    memset(mbr, 0, sizeof(MBR));
+    memset(mbr, 0, sizeof(struct MBR));
 
     sysprintf("PartitionNum =%d\n", myPmmcImage->PartitionNum);
     sysprintf("Partition1Size =%dMB,  SectorSize1=%d\n", myPmmcImage->Partition1Size, (myPmmcImage->Partition1Size)*2*1024);
@@ -236,26 +240,26 @@ PMBR create_mbr(UINT32 TotalSecSize, FW_MMC_IMAGE_T *myPmmcImage)
 
 
     mbr->mbrSignature=0xAA55;
-    fmiSDWrite(0, 1, (UINT8 *)mbr);
+    fmiSDWrite(0, 1, (uint8_t *)mbr);
     SendAck(10);
     MSG_DEBUG("10\n");
     return mbr;
 }
 
-INT32 FormatFat32(PMBR pmbr,UINT32 nCount)
+int32_t FormatFat32(struct MBR* pmbr,uint32_t nCount)
 {
-    UINT8  *pucSecBuff=NULL, *pucPtr;
-    INT     nSecPerClus;
-    UINT32  uFatSize, uRsvSecNum=34, uRootClus=2;
-    UINT32  uData1, uData2;
-    UINT32  uLogSecNo;
-    INT     nWrtSecNum, nStatus;
-    UINT8   FAT32Rsv[12] = { 0xF8, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F };
-    UINT8   pucCode[] = { 0x04, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x0F,0xFF, 0xFF, 0xFF, 0x0F, 0xF8, 0xFF, 0xFF, 0x0F };
+    uint8_t  *pucSecBuff=NULL, *pucPtr;
+    int     nSecPerClus;
+    uint32_t  uFatSize, uRsvSecNum=34, uRootClus=2;
+    uint32_t  uData1, uData2;
+    uint32_t  uLogSecNo;
+    int     nWrtSecNum, nStatus;
+    uint8_t   FAT32Rsv[12] = { 0xF8, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF, 0xFF, 0x0F };
+    uint8_t   pucCode[] = { 0x04, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x0F,0xFF, 0xFF, 0xFF, 0x0F, 0xF8, 0xFF, 0xFF, 0x0F };
     /*
      * Clear Reserved sectors
     */
-    pucSecBuff = (UINT8 *)((UINT32) DOWNLOAD_BASE | NON_CACHE);
+    pucSecBuff = (uint8_t *)((uint32_t) DOWNLOAD_BASE | NON_CACHE);
 
     if(pucSecBuff==NULL) return NULL;
     memset(pucSecBuff, 0x0, 512*WriteLen);
@@ -297,7 +301,6 @@ INT32 FormatFat32(PMBR pmbr,UINT32 nCount)
 
     pucSecBuff[13] = nSecPerClus;
 
-    //pmbr->mbrPartition[nCount].pteFirstSector
     /* sector per track */
     PUT16_L(pucPtr,24,pmbr->mbrPartition[nCount].pteEndSector);
     MSG_DEBUG("25-1\n");
@@ -321,11 +324,10 @@ INT32 FormatFat32(PMBR pmbr,UINT32 nCount)
         if (((uFatSize * 2) % nSecPerClus) == 0)
             uData1--;
     }
-    //_debug_msg("uFatSize=%d\n", uFatSize);
     PUT32_L(pucPtr,36,uFatSize);
     MSG_DEBUG("25-6\n");
     /* Volume serial number */
-    PUT32_L(pucPtr,67, get_timer_ticks());
+    PUT32_L(pucPtr,67, sysGetTicks(TIMER0));
     MSG_DEBUG("25-7\n");
     /* root directory cluster number */
     PUT32_L(pucPtr,44,uRootClus);
@@ -432,5 +434,5 @@ INT32 FormatFat32(PMBR pmbr,UINT32 nCount)
     MSG_DEBUG("80-6\n");
     SendAck(90);
     MSG_DEBUG("90\n");
-    return TRUE;
+    return true;
 }

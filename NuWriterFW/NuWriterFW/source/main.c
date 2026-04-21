@@ -13,11 +13,11 @@
 #include "filesystem.h"  //for eMMC format test
 
 extern void ParseFlashType(void);
-extern UINT32 eMMCBlockSize;
+extern uint32_t eMMCBlockSize;
 
-UINT32 PLL_Get(UINT32 reg,UINT srcclk)
+uint32_t PLL_Get(uint32_t reg, unsigned int srcclk)
 {
-    UINT32 N,M,P;
+    uint32_t N,M,P;
     N =((inpw(reg) & 0x007F)>>0)+1;
     M =((inpw(reg) & 0x1F80)>>7)+1;
     P =((inpw(reg) & 0xE000)>>13)+1;
@@ -25,8 +25,8 @@ UINT32 PLL_Get(UINT32 reg,UINT srcclk)
 }
 void CPU_Info(void)
 {
-    UINT32 system=12;
-    UINT32 cpu,pclk;
+    uint32_t system=12;
+    uint32_t cpu,pclk;
     switch( ((inpw(REG_CLKDIV0) & (0x3<<3))>>3)) {
     case 0:
         system=12;
@@ -50,13 +50,7 @@ void CPU_Info(void)
  *----------------------------------------------------------------------------*/
 int main()
 {
-    UINT32 StartAddr=0,ExeAddr=EXEADDR;
-    //PMBR pmbr;
-
-#if 0
-    outpw(REG_PWRON, inpw(REG_PWRON) & ~0x400); /* pull low D+ for USB 1.1 host detection */
-    outpw(REG_CLKSEL,  inpw(REG_CLKSEL)|CPU_FROM_EXTAL15M); /* system clock source is from external clock */
-#endif  //AHBIPRST
+    uint32_t StartAddr=0,ExeAddr=EXEADDR;
     UNLOCKREG();
 
     *((volatile unsigned int *)REG_AIC_MDCR)=0xFFFFFFFF;  // disable all interrupt channel
@@ -94,23 +88,17 @@ int main()
     udcInit();
 
     /* start Timer 0 */
-#if 1
     sysSetTimerReferenceClock(TIMER0, 12000000);
     sysStartTimer(TIMER0, 100, PERIODIC_MODE);
-#endif
 
     fmiHWInit();
     sysDelay(10);//For connection stability
 
-#if 1 /* SD Init */
+/* SD Init */
     _sd_ReferenceClock = 300000;//12000;    // kHz upll or hxt
     eMMCBlockSize=fmiInitSDDevice();
     sysDelay(10); //For connection stability
     MSG_DEBUG("eMMCBlockSize=%08x\n",eMMCBlockSize);
-//  pmbr=create_mbr(eMMCBlockSize,30);
-//  FormatFat32(pmbr,0);
-//  while(1);
-#endif
 
     sysprintf("Parse NuWriter command line\n");
     sysprintf("=======================================\n");

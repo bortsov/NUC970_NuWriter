@@ -13,10 +13,12 @@
 /* Project:                                                                          */
 /*                                                                                   */
 /*-----------------------------------------------------------------------------------*/
-#ifndef _USBD_H
-#define _USBD_H
+#pragma once
+
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
+
 #include "wbio.h"
 #include "wblib.h"
 #include "usbd.h"
@@ -165,32 +167,32 @@
 
 typedef struct usb_cmd
 {
-	UINT8	bmRequestType;
-	UINT8	bRequest;
-	UINT16	wValue;
-	UINT16	wIndex;
-	UINT16	wLength;
+	uint8_t	bmRequestType;
+	uint8_t	bRequest;
+	uint16_t	wValue;
+	uint16_t	wIndex;
+	uint16_t	wLength;
 }	USB_CMD_T;
 
 typedef struct
 {
-	UINT8 EP_Num;
-	UINT8 EP_Dir;
-	UINT8 EP_Type;
+	uint8_t EP_Num;
+	uint8_t EP_Dir;
+	uint8_t EP_Type;
 }	USB_EP_Inf_T;
 
 /* for mass storage */
 typedef struct Disk_Par_Inf {
-	UINT32	partition_size,
+	uint32_t	partition_size,
 			data_location,
 			bpb_location,
 			fat_location,
 			rootdir_location,
 			free_size;
-	UINT16	rootdirentryno,
+	uint16_t	rootdirentryno,
 			totalcluster,
 			NumCyl;
-	UINT8	NumHead,
+	uint8_t	NumHead,
 			NumSector,
 			capacity,
 			fatcopyno,
@@ -199,18 +201,18 @@ typedef struct Disk_Par_Inf {
 	} Disk_Par_Info;
 
 /* extern flags */
-extern UINT8 volatile bulkonlycmd;
-extern UINT8 _usbd_haltep1;
-extern UINT8 _usbd_haltep2;
+extern uint8_t volatile bulkonlycmd;
+extern uint8_t _usbd_haltep1;
+extern uint8_t _usbd_haltep2;
 
 #define HALT 	1
 #define UNHALT 	0
 
 /* extern functions */
-void ReceiveCBW(UINT32 );
-void SDRAM2USB_Int(UINT32  ,UINT32 );
-void SDRAM2USB_Bulk(UINT32  ,UINT32 );
-void USB2SDRAM_Bulk(UINT32  ,UINT32 );
+void ReceiveCBW(uint32_t );
+void SDRAM2USB_Int(uint32_t  ,uint32_t );
+void SDRAM2USB_Bulk(uint32_t  ,uint32_t );
+void USB2SDRAM_Bulk(uint32_t  ,uint32_t );
 void FshBuf2CBW(void);
 void CSW2FshBuf(void);
 void Inquiry_Command(void);
@@ -226,7 +228,7 @@ void Rd10_Command(void);
 void Wt10_Command(void);
 
 void udcMassBulk(void);
-UINT8 udcFlashInit(void);
+uint8_t udcFlashInit(void);
 
 void usbdHighSpeedInit(void);
 void usbdFullSpeedInit(void);
@@ -234,7 +236,7 @@ void usbdFullSpeedInit(void);
 void udcInit(void);  
 
 /* RAM Disk Function Prototype */
-void DRAM_Identify(UINT8 cap);
+void DRAM_Identify(uint8_t cap);
 
 
 void UsbResetDma(void);
@@ -257,8 +259,6 @@ void UsbResetDma(void);
 
 // for upgrade
 #define USBD_FLASH_SDRAM		  0x0
-//#define USBD_FLASH_NOR			  0x1
-//#define USBD_FLASH_NOR_RAW		0x2
 #define USBD_FLASH_NAND			  0x3
 #define USBD_FLASH_NAND_RAW		0x4
 #define USBD_FLASH_MMC			  0x5 
@@ -267,30 +267,20 @@ void UsbResetDma(void);
 #define USBD_FLASH_SPI_RAW		0x8
 #define USBD_MTP              0x9
 #define USBD_INFO							0xA
-//#define USBD_PACK							0xA
 
-// #define USBD_NOR_IMAGE_LIST		0x9
-// #define USBD_NAND_IMAGE_LIST		0xA
-// #define USBD_MMC_IMAGE_LIST		0xB
-// #define USBD_SPI_IMAGE_LIST		0xC
-//#define USBD_NOR_TYPE					0xD
 
 
 #define USBD_BURN_TYPE 			0x80
 
-extern UINT32 ChipID;
+extern uint32_t ChipID;
 extern unsigned int volatile FLASH_BASE;
-extern UINT32 volatile Bulk_Out_Transfer_Size;
+extern uint32_t volatile Bulk_Out_Transfer_Size;
 extern int volatile _usbd_IntraROM;
 extern int volatile _usbd_flash_type;
 extern int volatile _usbd_xusb_type;
 
 void udcInit(void);
-void SendAck(UINT32 status);
-int usb_send(UINT8* buf,UINT32 len);
-int usb_recv(UINT8* buf,UINT32 len);
-void SDRAM_USB_Transfer(UINT32 DRAM_Addr ,UINT32 Tran_Size);
-//---------------------------------------
-
-#endif
-
+void SendAck(uint32_t status);
+int usb_send(uint8_t* buf,uint32_t len);
+int usb_recv(uint8_t* buf,uint32_t len);
+void SDRAM_USB_Transfer(uint32_t DRAM_Addr ,uint32_t Tran_Size);

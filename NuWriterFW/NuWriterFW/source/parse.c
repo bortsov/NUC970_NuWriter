@@ -21,31 +21,98 @@
 
 #define SPI_BLOCK_SIZE (64*1024)
 
-UCHAR NandBlockSize=0;
-INT32 eMMCBlockSize=0;
+struct PACK_HEAD
+{
+	uint32_t actionFlag;
+	uint32_t fileLength;
+	uint32_t num;
+	uint32_t reserve[1];
+};
+
+//PACK--------------------------------
+struct PACK_CHILD_HEAD
+{
+	uint32_t filelen;
+	uint32_t startaddr;
+	uint32_t imagetype;
+	uint32_t reserve[1];
+};
+
+struct FW_NAND_IMAGE
+{
+    uint32_t  actionFlag;
+    uint32_t  fileLength;
+    uint32_t  imageNo;
+    char    imageName[16];
+    uint32_t  imageType;
+    uint32_t  executeAddr;    // endblock
+    uint32_t  blockNo;        // startblock
+    uint32_t  dummy;
+    uint8_t macaddr[8];
+    uint32_t initSize;
+};
+
+
+#if defined ( __CC_ARM   )
+#pragma anon_unions
+#endif
+struct FW_NOR_IMAGE
+{
+    uint32_t  actionFlag;
+    uint32_t  fileLength;
+	union{
+    uint32_t  imageNo;
+		uint32_t  num;
+	};
+    char    imageName[16];
+    uint32_t  imageType;
+    uint32_t  executeAddr;
+    uint32_t  flashOffset;
+    uint32_t  endAddr;
+    uint8_t   macaddr[8];
+    uint32_t  initSize;
+};
+
+#if defined ( __CC_ARM   )
+#pragma no_anon_unions
+#endif
+
+//MTP---------------------------------
+struct FW_OTP_IMAGE
+{
+    uint8_t   Mode;
+    uint8_t   Option;
+    uint8_t   Lock;
+    uint8_t   Reserved[2];
+    uint32_t  KeyLen;
+    uint32_t  KeyOTP[8];
+};
+
+uint8_t NandBlockSize=0;
+int32_t eMMCBlockSize=0;
 
 unsigned char *pImageList;
 unsigned char imageList[512];
 
-FW_NOR_IMAGE_T spiImage;
-FW_NOR_IMAGE_T *pSpiImage;
+struct FW_NOR_IMAGE spiImage;
+struct FW_NOR_IMAGE *pSpiImage;
 
 //-------------------------
 extern int usiInit(void);
 extern int usiEraseAll(void);
-extern int usiWrite(UINT32 addr, UINT32 len, UINT16 *buf);
-extern int usiRead(UINT32 addr, UINT32 len, UINT8 *buf);
-extern int usiEraseSector(UINT32 addr, UINT32 secCount);
+extern int usiWrite(uint32_t addr, uint32_t len, uint16_t *buf);
+extern int usiRead(uint32_t addr, uint32_t len, uint8_t *buf);
+extern int usiEraseSector(uint32_t addr, uint32_t secCount);
 extern int spiNorReset(void);
 
-extern int ChangeSpiImageType(UINT32 imageNo, UINT32 imageType);
-extern int DelSpiImage(UINT32 imageNo);
-extern int DelSpiSector(UINT32 start, UINT32 len);
+extern int ChangeSpiImageType(uint32_t imageNo, uint32_t imageType);
+extern int DelSpiImage(uint32_t imageNo);
+extern int DelSpiSector(uint32_t start, uint32_t len);
 
-extern INT16 usiReadID(void);
-extern UINT32 Custom_uBlockPerFlash;
-extern UINT32 Custom_uPagePerBlock;
-UINT32 g_uIsUserConfig;
+extern int16_t usiReadID(void);
+extern uint32_t Custom_uBlockPerFlash;
+extern uint32_t Custom_uPagePerBlock;
+uint32_t g_uIsUserConfig;
 extern volatile unsigned char Enable4ByteFlag;
 //-------------------------
 #define PACK_Mode(val)      (((val)&0xF   )>> 0)
@@ -81,16 +148,16 @@ void usleep(int count)
     for(i=0; i<count; i++);
 }
 
-UINT32 fmiGetSPIImageInfo(unsigned int *image)
+uint32_t fmiGetSPIImageInfo(unsigned int *image)
 {
-    UINT32 volatile bmark, emark;
+    uint32_t volatile bmark, emark;
     int volatile i, imageCount=0;
     unsigned char volatile *pbuf;
     unsigned int volatile *ptr;
-    UCHAR _fmi_ucBuffer[1024];
-    pbuf = (UINT8 *)((UINT32)_fmi_ucBuffer | 0x80000000);
-    ptr = (unsigned int *)((UINT32)_fmi_ucBuffer | 0x80000000);
-    usiRead(((SPI_HEAD_ADDR-1)*64+63)*1024, 1024, (UINT8 *)pbuf);  /* offset, len, address */
+    uint8_t _fmi_ucBuffer[1024];
+    pbuf = (uint8_t *)((uint32_t)_fmi_ucBuffer | 0x80000000);
+    ptr = (unsigned int *)((uint32_t)_fmi_ucBuffer | 0x80000000);
+    usiRead(((SPI_HEAD_ADDR-1)*64+63)*1024, 1024, (uint8_t *)pbuf);  /* offset, len, address */
     bmark = *(ptr+0);
     emark = *(ptr+3);
 
@@ -158,7 +225,7 @@ void GetSPIImage()
             count = 0;
     }
     usleep(1000);
-    usb_send(pImageList, count*(sizeof(FW_NOR_IMAGE_T))+4);
+    usb_send(pImageList, count*(sizeof(struct FW_NOR_IMAGE))+4);
 
     MSG_DEBUG("finish get spi image [%d]!!\n", count);
 }
@@ -170,27 +237,27 @@ void GetSPIImage()
  ******************************************************************************/
 
 /********************* Bit definition of OTP_KEYEN  ************************/
-#define OTP_KEYEN_EN          ((UINT32)0x00000001)      /*!<AES DMA finish interrupt flag enable */
+#define OTP_KEYEN_EN          ((uint32_t)0x00000001)      /*!<AES DMA finish interrupt flag enable */
 
 /********************* Bit definition of OTP_MODE  *************************/
-#define OTP_MODE_MASK         ((UINT32)0x00000003)      /*!<OTP mode control bits mask */
-#define OTP_MODE_IDLE         ((UINT32)0x00000000)      /*!<OTP idle mode */
-#define OTP_MODE_PROGRAM      ((UINT32)0x00000002)      /*!<OTP program key mode */
-#define OTP_MODE_LOCK         ((UINT32)0x00000003)      /*!<OTP lock key mode */
+#define OTP_MODE_MASK         ((uint32_t)0x00000003)      /*!<OTP mode control bits mask */
+#define OTP_MODE_IDLE         ((uint32_t)0x00000000)      /*!<OTP idle mode */
+#define OTP_MODE_PROGRAM      ((uint32_t)0x00000002)      /*!<OTP program key mode */
+#define OTP_MODE_LOCK         ((uint32_t)0x00000003)      /*!<OTP lock key mode */
 
 /********************* Bit definition of OTP_START  *************************/
-#define OTP_START_START       ((UINT32)0x00000001)      /*!<OTP start  */
+#define OTP_START_START       ((uint32_t)0x00000001)      /*!<OTP start  */
 
 /********************* Bit definition of OTP_STATUS  ************************/
-#define OTP_STATUS_ENABLED    ((UINT32)0x00000001)      /*!<OTP is enabled   */
-#define OTP_STATUS_KEY_VALID  ((UINT32)0x00000002)      /*!<last key in OTP is valid */
-#define OTP_STATUS_NO_PROG    ((UINT32)0x00000004)      /*!<No key programmed */
-#define OTP_STATUS_LOCKED     ((UINT32)0x00000008)      /*!<OTP is locked  */
-#define OTP_STATUS_PROG_FAIL  ((UINT32)0x00000010)      /*!<OTP program fail   */
-#define OTP_STATUS_BUSY       ((UINT32)0x00000010)      /*!<OTP program fail   */
+#define OTP_STATUS_ENABLED    ((uint32_t)0x00000001)      /*!<OTP is enabled   */
+#define OTP_STATUS_KEY_VALID  ((uint32_t)0x00000002)      /*!<last key in OTP is valid */
+#define OTP_STATUS_NO_PROG    ((uint32_t)0x00000004)      /*!<No key programmed */
+#define OTP_STATUS_LOCKED     ((uint32_t)0x00000008)      /*!<OTP is locked  */
+#define OTP_STATUS_PROG_FAIL  ((uint32_t)0x00000010)      /*!<OTP program fail   */
+#define OTP_STATUS_BUSY       ((uint32_t)0x00000010)      /*!<OTP program fail   */
 
 /********************* Bit definition of OTP_PROTECT  ***********************/
-#define OTP_PROTECT_UNLOCKED    ((UINT32)0x00000001)      /*!<OTP unlocked   */
+#define OTP_PROTECT_UNLOCKED    ((uint32_t)0x00000001)      /*!<OTP unlocked   */
 
 /****************************************************************************/
 #define POOLING_LOOP        0x8000000
@@ -202,7 +269,7 @@ void GetSPIImage()
 #define MTP_ENABLE_SUCCESS  0x85
 
 /****************************************************************************/
-void MTP_Check_Key(UINT32  key[8])
+void MTP_Check_Key(uint32_t  key[8])
 {
     int  i;
 
@@ -240,34 +307,18 @@ int MTP_Enable()
     return -1;
 }
 #define MTP_DELAY 0x100000
-int MTP_Program_Key(UINT8 *wbuf,UINT32 len,UINT8 option,UINT8 mode)
+int MTP_Program_Key(uint8_t *wbuf,uint32_t len,uint8_t option,uint8_t mode)
 {
-    UINT8 BootSrc=0;
-    UINT32  otp_key[8];
-    UINT32 * g_sha_digest =(UINT32 *)wbuf;
+    uint8_t BootSrc=0;
+    uint32_t  otp_key[8];
+    uint32_t * g_sha_digest =(uint32_t *)wbuf;
     int  loop,i,j;
-    UINT8 data[4];
+    uint8_t data[4];
     outpw(REG_PCLKEN1, inpw(REG_PCLKEN1) | (1 << 26));
 
     MTP_Enable();
     outpw(REG_OTP_MODE, (inpw(REG_OTP_MODE) & 0x3) | 0x2);
     outpw(REG_OTP_CYCLE, 0x60AE * 8);
-
-    /* 8b0c0f24 fa2fc0ef 7501698e 7c2ba644 81bebd41 6d446548 32d3aa5b 733518b9 */
-#if 0
-    for(i=0; i<8; i++) {
-        for(j=0; j<4; j++)
-            data[j]=wbuf[i*4+(3-j)];
-        MSG_DEBUG("0x%08x=0x%08x\n",REG_OTP_VALUE0+i*4,*((UINT32 *)(data)) );
-        g_sha_digest[i]=*((UINT32 *)data);
-    }
-#endif
-
-#if 0
-    for(i=0; i<8; i++) {
-        MSG_DEBUG("0x%08x=0x%08x\n",REG_OTP_VALUE0+i*4,g_sha_digest[i] );
-    }
-#endif
 
     switch(option & 0x3) {
     case 1:  /*AES*/
@@ -276,7 +327,7 @@ int MTP_Program_Key(UINT8 *wbuf,UINT32 len,UINT8 option,UINT8 mode)
         for(i=0; i<8; i++) {
             for(j=0; j<4; j++)
                 data[j]=wbuf[i*4+(3-j)];
-            g_sha_digest[i]=*((UINT32 *)data);
+            g_sha_digest[i]=*((uint32_t *)data);
         }
         break;
     case 2:  /*SHA*/
@@ -417,13 +468,13 @@ int MTP_Lock()
  *  MTP Functions End
  ******************************************************************************/
 
-int Burn_SPI(UINT32 len,UINT32 imageoffset)
+int Burn_SPI(uint32_t len,uint32_t imageoffset)
 {
     int volatile tmplen=0;
     int i, offset=0, blockCount, spiSourceAddr;
     //unsigned char infoBuf[1024];
     //unsigned char *pInfo;
-    //pInfo = (UINT8 *)((UINT32)infoBuf | NON_CACHE);
+    //pInfo = (uint8_t *)((uint32_t)infoBuf | NON_CACHE);
 
     /* set up interface */
     if (usiInit() < 0) {
@@ -447,7 +498,7 @@ int Burn_SPI(UINT32 len,UINT32 imageoffset)
             MSG_DEBUG("Enable4ByteFlag %d:  offset=0x%08x(%d)\n", Enable4ByteFlag, offset, offset);
 
         usiEraseSector(offset, 1);
-        usiWrite(offset, SPI_BLOCK_SIZE, (UINT16 *)spiSourceAddr);
+        usiWrite(offset, SPI_BLOCK_SIZE, (uint16_t *)spiSourceAddr);
 
         spiSourceAddr += SPI_BLOCK_SIZE;
         offset += SPI_BLOCK_SIZE;
@@ -469,7 +520,7 @@ int Burn_SPI(UINT32 len,UINT32 imageoffset)
             MSG_DEBUG("Enable4ByteFlag %d:  offset=0x%08x(%d)\n", Enable4ByteFlag, offset, offset);		
         len = len - blockCount*SPI_BLOCK_SIZE;
         usiEraseSector(offset, 1);
-        usiWrite(offset, len, (UINT16 *)spiSourceAddr);
+        usiWrite(offset, len, (uint16_t *)spiSourceAddr);
     }
     //ack status
     SendAck(100);
@@ -478,13 +529,13 @@ int Burn_SPI(UINT32 len,UINT32 imageoffset)
 }
 
 
-int Burn_FastSPI(UINT32 len,UINT32 imageoffset)
+int Burn_FastSPI(uint32_t len,uint32_t imageoffset)
 {
     int volatile tmplen=0;
     int i, offset=0, blockCount, spiSourceAddr;
     //unsigned char infoBuf[1024];
     //unsigned char *pInfo;
-    //pInfo = (UINT8 *)((UINT32)infoBuf | NON_CACHE);
+    //pInfo = (uint8_t *)((uint32_t)infoBuf | NON_CACHE);
     MSG_DEBUG("Burn_FastSPI: len=%d     imageoffset= 0x%08x(%d)\n", len, imageoffset, imageoffset);
     /* set up interface */
     if (usiInit() < 0) {
@@ -514,7 +565,7 @@ int Burn_FastSPI(UINT32 len,UINT32 imageoffset)
         if(Enable4ByteFlag)
             MSG_DEBUG("Burn_FastSPI Enable4ByteFlag %d  blockCount:%d offset=0x%08x(%d)\n", Enable4ByteFlag, i, offset, offset);
 
-        usiWrite(offset, SPI_BLOCK_SIZE, (UINT16 *)spiSourceAddr);
+        usiWrite(offset, SPI_BLOCK_SIZE, (uint16_t *)spiSourceAddr);
 
         spiSourceAddr += SPI_BLOCK_SIZE;
         offset += SPI_BLOCK_SIZE;
@@ -543,7 +594,7 @@ int Burn_FastSPI(UINT32 len,UINT32 imageoffset)
 
         len = len - blockCount*SPI_BLOCK_SIZE;
         //usiEraseSector(offset, 1);
-        usiWrite(offset, len, (UINT16 *)spiSourceAddr);
+        usiWrite(offset, len, (uint16_t *)spiSourceAddr);
     }
     //ack status
     SendAck(100);
@@ -560,13 +611,13 @@ void UXmodem_SPI(void)
     unsigned int *_ack;
     unsigned int offset=0;
     unsigned int remain, ddrlen;
-    PACK_HEAD pack;
-    PACK_CHILD_HEAD ppack;
+    struct PACK_HEAD pack;
+    struct PACK_CHILD_HEAD ppack;
     unsigned int ret;
 
     MSG_DEBUG("download image to SPI flash...\n");
-    memset((char *)&spiImage, 0, sizeof(FW_NOR_IMAGE_T));
-    pSpiImage = (FW_NOR_IMAGE_T *)&spiImage;
+    memset((char *)&spiImage, 0, sizeof(struct FW_NOR_IMAGE));
+    pSpiImage = (struct FW_NOR_IMAGE *)&spiImage;
     usiInit();  //Init SPI
     _ch=((unsigned char*)(((unsigned int)buf)|NON_CACHE));
     _ack=((unsigned int*)(((unsigned int)buf)|NON_CACHE));
@@ -574,8 +625,8 @@ void UXmodem_SPI(void)
 
     while(1) {
         if(Bulk_Out_Transfer_Size>0) {
-            usb_recv(ptr,sizeof(FW_NOR_IMAGE_T));
-            memcpy(pSpiImage,(unsigned char *)ptr,sizeof(FW_NOR_IMAGE_T));
+            usb_recv(ptr,sizeof(struct FW_NOR_IMAGE));
+            memcpy(pSpiImage,(unsigned char *)ptr,sizeof(struct FW_NOR_IMAGE));
             break;
         }
     }
@@ -616,9 +667,9 @@ void UXmodem_SPI(void)
                 *_ack=len;
                 usb_send((unsigned char*)_ack,4);//send ack to PC
             }
-        } while((ptr-_ch)<(pSpiImage->fileLength+offset+((FW_NOR_IMAGE_T *)pSpiImage)->initSize));
+        } while((ptr-_ch)<(pSpiImage->fileLength+offset+((struct FW_NOR_IMAGE *)pSpiImage)->initSize));
 
-        Burn_SPI(pSpiImage->fileLength+(((FW_NOR_IMAGE_T *)pSpiImage)->initSize)+offset,pSpiImage->flashOffset);
+        Burn_SPI(pSpiImage->fileLength+(((struct FW_NOR_IMAGE *)pSpiImage)->initSize)+offset,pSpiImage->flashOffset);
     }
     break;
 
@@ -695,9 +746,9 @@ void UXmodem_SPI(void)
                 MSG_DEBUG("VERIFY_MODE  Enable4ByteFlag %d:  offset=0x%08x(%d)\n", Enable4ByteFlag, offset, offset);
 
             if (pSpiImage->flashOffset == 0)
-                usiRead(pSpiImage->flashOffset+16+offset+((FW_NOR_IMAGE_T *)pSpiImage)->initSize, TRANSFER_LEN, (UINT8 *)(DOWNLOAD_BASE));
+                usiRead(pSpiImage->flashOffset+16+offset+((struct FW_NOR_IMAGE *)pSpiImage)->initSize, TRANSFER_LEN, (uint8_t *)(DOWNLOAD_BASE));
             else
-                usiRead(pSpiImage->flashOffset+offset, TRANSFER_LEN, (UINT8 *)(DOWNLOAD_BASE));
+                usiRead(pSpiImage->flashOffset+offset, TRANSFER_LEN, (uint8_t *)(DOWNLOAD_BASE));
             usb_send(ptr,TRANSFER_LEN); //send data to PC
 
             usb_recv((unsigned char*)_ack,4);   //recv data from PC
@@ -728,9 +779,9 @@ void UXmodem_SPI(void)
 
         for(i=0; i<pSpiImage->imageNo; i++) {
             while(1) {
-                if(Bulk_Out_Transfer_Size>=sizeof(PACK_CHILD_HEAD)) {
-                    usb_recv(ptr,sizeof(PACK_CHILD_HEAD));
-                    memcpy(&ppack,(unsigned char *)ptr,sizeof(PACK_CHILD_HEAD));
+                if(Bulk_Out_Transfer_Size>=sizeof(struct PACK_CHILD_HEAD)) {
+                    usb_recv(ptr,sizeof(struct PACK_CHILD_HEAD));
+                    memcpy(&ppack,(unsigned char *)ptr,sizeof(struct PACK_CHILD_HEAD));
                     usleep(1000);
                     *_ack=0x85;
                     usb_send((unsigned char*)_ack,4);//send ack to PC
@@ -767,28 +818,21 @@ void UXmodem_SPI(void)
                 if (offset == 0) {
                     if (ppack.imagetype == UBOOT) {   // system image
                         pSpiImage->fileLength = pSpiImage->fileLength - 16 - ddrlen;
-                        usiRead(pSpiImage->flashOffset+16+ddrlen+offset+((FW_NOR_IMAGE_T *)pSpiImage)->initSize, TRANSFER_LEN, (UINT8 *)(DOWNLOAD_BASE));
-                        //sysprintf("@0000 %d, %d, %d, ((FW_NOR_IMAGE_T *)pSpiImage)->initSize->%d, spi read addr = 0x%x \n", pSpiImage->flashOffset,ddrlen, offset, ((FW_NOR_IMAGE_T *)pSpiImage)->initSize, pSpiImage->flashOffset+16+ddrlen+offset+((FW_NOR_IMAGE_T *)pSpiImage)->initSize);
+                        usiRead(pSpiImage->flashOffset+16+ddrlen+offset+((struct FW_NOR_IMAGE *)pSpiImage)->initSize, TRANSFER_LEN, (uint8_t *)(DOWNLOAD_BASE));
                     } else {
-                        usiRead(pSpiImage->flashOffset+offset, TRANSFER_LEN, (UINT8 *)(DOWNLOAD_BASE));
-                        //sysprintf("0000@ spi read size = 0x%x \n", offset);
+                        usiRead(pSpiImage->flashOffset+offset, TRANSFER_LEN, (uint8_t *)(DOWNLOAD_BASE));
                     }
                 } else {
 
                     if (ppack.imagetype == UBOOT) {   // system image
-                        usiRead(pSpiImage->flashOffset+16+ddrlen+offset+((FW_NOR_IMAGE_T *)pSpiImage)->initSize, TRANSFER_LEN, (UINT8 *)(DOWNLOAD_BASE));
-                        //sysprintf("@1111 %d, %d, %d, ((FW_NOR_IMAGE_T *)pSpiImage)->initSize->%d, spi read addr = 0x%x \n", pSpiImage->flashOffset,ddrlen, offset, ((FW_NOR_IMAGE_T *)pSpiImage)->initSize, pSpiImage->flashOffset+16+ddrlen+offset+((FW_NOR_IMAGE_T *)pSpiImage)->initSize);
+                        usiRead(pSpiImage->flashOffset+16+ddrlen+offset+((struct FW_NOR_IMAGE *)pSpiImage)->initSize, TRANSFER_LEN, (uint8_t *)(DOWNLOAD_BASE));
                     } else {
-                        usiRead(pSpiImage->flashOffset+offset, TRANSFER_LEN, (UINT8 *)(DOWNLOAD_BASE));
-                        //sysprintf("1111@ spi read size = 0x%x \n", offset);
+                        usiRead(pSpiImage->flashOffset+offset, TRANSFER_LEN, (uint8_t *)(DOWNLOAD_BASE));
                     }
                 }
 
                 usb_send(ptr,TRANSFER_LEN); //send data to PC
-                //sysprintf("@2222 SPI usb_send = 0x%x(%d), len = 0x%x(%d) \n", offset, offset, pSpiImage->fileLength, pSpiImage->fileLength);
                 usb_recv((unsigned char*)_ack,4);   //recv data from PC
-                //sysprintf("@3333 SPI usb_recv = 0x%x \n", (*_ack));
-                //ptr += (*_ack);
                 if(*_ack==0)
                     break;
                 else
@@ -860,13 +904,13 @@ void UXmodem_SPI(void)
         _ch=((unsigned char*)(((unsigned int)DOWNLOAD_BASE)|NON_CACHE));
         ptr=_ch;
         {
-            PACK_HEAD pack;
-            PACK_CHILD_HEAD ppack;
+            struct PACK_HEAD pack;
+            struct PACK_CHILD_HEAD ppack;
             while(1) {
-                if(Bulk_Out_Transfer_Size>=sizeof(PACK_HEAD)) {
-                    usb_recv(ptr,sizeof(PACK_HEAD));
-                    memcpy(&pack,(unsigned char *)ptr,sizeof(PACK_HEAD));
-                    *_ack=sizeof(PACK_CHILD_HEAD);
+                if(Bulk_Out_Transfer_Size>=sizeof(struct PACK_HEAD)) {
+                    usb_recv(ptr,sizeof(struct PACK_HEAD));
+                    memcpy(&pack,(unsigned char *)ptr,sizeof(struct PACK_HEAD));
+                    *_ack=sizeof(struct PACK_CHILD_HEAD);
                     usb_send((unsigned char*)_ack,4);//send ack to PC
                     break;
                 }
@@ -874,9 +918,9 @@ void UXmodem_SPI(void)
             MSG_DEBUG("pack.actionFlag=0x%x, pack.fileLength=0x%08x pack.num=%d!!!\n",pack.actionFlag,pack.fileLength,pack.num);
             for(i=0; i<pack.num; i++) {
                 while(1) {
-                    if(Bulk_Out_Transfer_Size>=sizeof(PACK_CHILD_HEAD)) {
-                        usb_recv(ptr,sizeof(PACK_CHILD_HEAD));
-                        memcpy(&ppack,(unsigned char *)ptr,sizeof(PACK_CHILD_HEAD));
+                    if(Bulk_Out_Transfer_Size>=sizeof(struct PACK_CHILD_HEAD)) {
+                        usb_recv(ptr,sizeof(struct PACK_CHILD_HEAD));
+                        memcpy(&ppack,(unsigned char *)ptr,sizeof(struct PACK_CHILD_HEAD));
                         break;
                     }
                 }
@@ -898,8 +942,8 @@ void UXmodem_SPI(void)
                     //Burn_FastSPI(ppack.filelen,((ppack.startaddr+SPI_BLOCK_SIZE-1)/SPI_BLOCK_SIZE)*SPI_BLOCK_SIZE);
 
                 } else { /* if(ppack.imagetype==PMTP) */
-                    UINT32 m_mtp_mode,m_mtp_option,m_mtp_encrypt,m_mtp_enable,j;
-                    FW_OTP_IMAGE_T MTPImage;
+                    uint32_t m_mtp_mode,m_mtp_option,m_mtp_encrypt,m_mtp_enable,j;
+                    struct FW_OTP_IMAGE MTPImage;
                     m_mtp_mode=PACK_Mode(ppack.startaddr);
                     m_mtp_option=PACK_Option(ppack.startaddr);
                     m_mtp_encrypt=PACK_Encrypt(ppack.startaddr);
@@ -915,7 +959,7 @@ void UXmodem_SPI(void)
                     for(j=0; j<8; j++)
                         MSG_DEBUG("KeyMTP[%d] = 0x%08x \n",j, MTPImage.KeyOTP[j]);
                     if(!MTP_IsLock()) {
-                        MTP_Program_Key((UINT8 *)(&MTPImage.KeyOTP[0]),MTPImage.KeyLen,MTPImage.Option,MTPImage.Mode);
+                        MTP_Program_Key((uint8_t *)(&MTPImage.KeyOTP[0]),MTPImage.KeyLen,MTPImage.Option,MTPImage.Mode);
                         if(MTPImage.Lock==1)
                             MTP_Lock();
                     }
@@ -932,19 +976,17 @@ void UXmodem_SPI(void)
 }
 
 extern void fw_dtbfunc(int,int,int,int);
-int Run_SDRAM(UINT32 address,UINT32 offset,UINT32 tmpAddr,UINT32 dtbEn,UINT32 dtbAddr)
+int Run_SDRAM(uint32_t address,uint32_t offset,uint32_t tmpAddr,uint32_t dtbEn,uint32_t dtbAddr)
 {
     unsigned int i;
     int volatile status = 0;
     void    (*fw_func)(int, int, int);
     fw_func = (void(*)(int, int, int))address;
-#if 1
     /* Disable all interrupts */
     sysSetGlobalInterrupt(DISABLE_ALL_INTERRUPTS);
     sysSetLocalInterrupt(DISABLE_FIQ_IRQ);
 
     sysFlushCache(I_D_CACHE);
-//  outpw(REG_USBD_PHY_CTL, inpw(REG_USBD_PHY_CTL) & ~0x200);    // offset 0x704
 
     outpw(REG_AHBIPRST,1<<19);  //USBD reset
     outpw(REG_AHBIPRST,0<<19);
@@ -959,8 +1001,6 @@ int Run_SDRAM(UINT32 address,UINT32 offset,UINT32 tmpAddr,UINT32 dtbEn,UINT32 dt
     for(i=(unsigned int)REG_MFP_GPA_L; i<=(unsigned int)REG_MFP_GPI_H; i+=4)
         outpw(i,0x00);
     LOCKREG();
-#endif
-    //outpw(REG_PCLKEN0, 1<<16);  //enable uart0
 
     if(address<offset)
         memcpy((unsigned char *)address,(unsigned char *)tmpAddr,offset);
@@ -1075,27 +1115,27 @@ void UXmodem_SDRAM(void)
  *  eMMC Functions
  *
  ******************************************************************************/
-extern FW_MMC_IMAGE_T mmcImage;
-extern FW_MMC_IMAGE_T *pmmcImage;
+extern struct FW_MMC_IMAGE mmcImage;
+extern struct FW_MMC_IMAGE *pmmcImage;
 extern void GetMMCImage(void);
 
-void Burn_MMC_RAW(UINT32 len, UINT32 offset,UINT8 *ptr)
+void Burn_MMC_RAW(uint32_t len, uint32_t offset,uint8_t *ptr)
 {
     MSG_DEBUG("offset=%d,len=%d\n",offset>>9,len>>9);
-    fmiSD_Write(offset>>9, len>>9, (UINT32)ptr);
+    fmiSD_Write(offset>>9, len>>9, (uint32_t)ptr);
 }
 
-void Read_MMC_RAW(UINT32 len, UINT32 offset,UINT8 *ptr)
+void Read_MMC_RAW(uint32_t len, uint32_t offset,uint8_t *ptr)
 {
     MSG_DEBUG("offset=%d,len=%d\n",offset>>9,len>>9);
-    fmiSD_Read(offset>>9, len>>9, (UINT32)ptr);
+    fmiSD_Read(offset>>9, len>>9, (uint32_t)ptr);
 }
-#if defined(BATCH_BRUN)
-int BatchBurn_MMC_BOOT(UINT32 len,UINT32 offset)
+
+int BatchBurn_MMC_BOOT(uint32_t len,uint32_t offset)
 {
     int volatile tmplen=0;
-    UINT32 TotalBlkCount,blockCount, mmcSourceAddr;
-    UINT8 infoBuf[512],*ptr;
+    uint32_t TotalBlkCount,blockCount, mmcSourceAddr;
+    uint8_t infoBuf[512],*ptr;
 
     unsigned char *_ch;
     unsigned int *_ack,ack=0;
@@ -1110,12 +1150,8 @@ int BatchBurn_MMC_BOOT(UINT32 len,UINT32 offset)
         return Fail;
     }
 
-    /* check image 0 / offset 0 and back up */
-    //if (pmmcImage->imageType == UBOOT)  // system image, burn nomal image
-    //    fmiSD_Read(MMC_INFO_SECTOR,1,(UINT32)pInfo);
-
     mmcSourceAddr = (DOWNLOAD_BASE | NON_CACHE);
-    ptr = (UINT8 *)mmcSourceAddr;
+    ptr = (uint8_t *)mmcSourceAddr;
     TotalBlkCount = blockCount = (len+((SD_SECTOR)-1))/(SD_SECTOR);
 
     while(blockCount>=SD_MUL) {
@@ -1132,8 +1168,8 @@ int BatchBurn_MMC_BOOT(UINT32 len,UINT32 offset)
             }
         } while((ptr-_ch)<(remainlen!=0));
 
-        MSG_DEBUG("offset=0x%08x,ptr_addr=0x%08x,ptr=%d\n",offset,(UINT32)ptr,*(ptr));
-        fmiSD_Write(offset,SD_MUL,(UINT32)ptr);
+        MSG_DEBUG("offset=0x%08x,ptr_addr=0x%08x,ptr=%d\n",offset,(uint32_t)ptr,*(ptr));
+        fmiSD_Write(offset,SD_MUL,(uint32_t)ptr);
         blockCount-=SD_MUL;
         offset+=SD_MUL;
         /* ack status */
@@ -1153,12 +1189,12 @@ int BatchBurn_MMC_BOOT(UINT32 len,UINT32 offset)
                 usb_send((unsigned char*)_ack,4);//send ack to PC
             }
         } while((ptr-_ch)<(remainlen!=0));
-        fmiSD_Write(offset,blockCount,(UINT32)ptr);
+        fmiSD_Write(offset,blockCount,(uint32_t)ptr);
     }
     /* restore image 0 and offset 0 */
     if (pmmcImage->imageType == 3) { // system image, burn nomal image
         if((pmmcImage)->macaddr[7]==1)
-            memcpy(infoBuf+0x190,(UCHAR *)((pmmcImage)->macaddr),6);  // MAC Address
+            memcpy(infoBuf+0x190,(uint8_t *)((pmmcImage)->macaddr),6);  // MAC Address
     }
 
     if ((pmmcImage->flashOffset != 2) || (pmmcImage->imageType == 3)) {
@@ -1171,14 +1207,12 @@ int BatchBurn_MMC_BOOT(UINT32 len,UINT32 offset)
 
     return 0;
 }
-#endif
 
-#if defined(BATCH_BRUN)
-int BatchBurn_MMC(UINT32 len,UINT32 offset,UINT32 HeaderFlag)
+int BatchBurn_MMC(uint32_t len,uint32_t offset,uint32_t HeaderFlag)
 {
     int volatile tmplen=0;
-    UINT32 blockCount=0, mmcSourceAddr;
-    UINT8 infoBuf[512],*ptr;
+    uint32_t blockCount=0, mmcSourceAddr;
+    uint8_t infoBuf[512],*ptr;
 
     unsigned char *_ch;
     unsigned int *_ack,ack=0;
@@ -1199,12 +1233,8 @@ int BatchBurn_MMC(UINT32 len,UINT32 offset,UINT32 HeaderFlag)
         return Fail;
     }
 
-    /* check image 0 / offset 0 and back up */
-    //if (pmmcImage->imageType == UBOOT)  // system image, burn normal image
-    //    fmiSD_Read(MMC_INFO_SECTOR,1,(UINT32)pInfo);
-
     mmcSourceAddr = (DOWNLOAD_BASE | NON_CACHE);
-    ptr = (UINT8 *)mmcSourceAddr;
+    ptr = (uint8_t *)mmcSourceAddr;
     tmplen=len;
     //sysprintf("debug 1111  blockCount=%d   tmplen=%d    _ack = 0x%x\n",blockCount, tmplen, *_ack);
     while(tmplen>TRANSFER_LEN) {
@@ -1221,8 +1251,8 @@ int BatchBurn_MMC(UINT32 len,UINT32 offset,UINT32 HeaderFlag)
             }
         } while(remainlen!=0);
         ptr=_ch;
-        MSG_DEBUG("tmplen=0x%08x,ptr_addr=0x%08x,ptr=%d\n",tmplen,(UINT32)ptr,*(ptr));
-        fmiSD_Write(offset,SD_MUL,(UINT32)ptr);
+        MSG_DEBUG("tmplen=0x%08x,ptr_addr=0x%08x,ptr=%d\n",tmplen,(uint32_t)ptr,*(ptr));
+        fmiSD_Write(offset,SD_MUL,(uint32_t)ptr);
         blockCount-=SD_MUL;
         offset+=SD_MUL;
         tmplen -= (SD_SECTOR*SD_MUL);
@@ -1242,14 +1272,14 @@ int BatchBurn_MMC(UINT32 len,UINT32 offset,UINT32 HeaderFlag)
             }
         } while(remainlen!=0);
         ptr=_ch;
-        MSG_DEBUG("tmplen=0x%08x,ptr_addr=0x%08x,ptr=%d\n",tmplen,(UINT32)ptr,*(ptr));
-        fmiSD_Write(offset,(tmplen+SD_SECTOR-1)/SD_SECTOR,(UINT32)ptr);
+        MSG_DEBUG("tmplen=0x%08x,ptr_addr=0x%08x,ptr=%d\n",tmplen,(uint32_t)ptr,*(ptr));
+        fmiSD_Write(offset,(tmplen+SD_SECTOR-1)/SD_SECTOR,(uint32_t)ptr);
     }
     /* restore image 0 and offset 0 */
     if (pmmcImage->imageType == 3/*PACK*/)   // system image, burn normal image
     {
         if((pmmcImage)->macaddr[7]==1)
-            memcpy(infoBuf+0x190,(UCHAR *)((pmmcImage)->macaddr),6);  // MAC Address
+            memcpy(infoBuf+0x190,(uint8_t *)((pmmcImage)->macaddr),6);  // MAC Address
     }
 
     if ((pmmcImage->flashOffset != 2) || (pmmcImage->imageType == 3/*PACK*/)) {
@@ -1262,16 +1292,15 @@ int BatchBurn_MMC(UINT32 len,UINT32 offset,UINT32 HeaderFlag)
 
     return 0;
 }
-#endif
 
-int Burn_MMC(UINT32 len,UINT32 offset)
+int Burn_MMC(uint32_t len,uint32_t offset)
 {
     int volatile tmplen=0;
-    UINT32 blockCount, mmcSourceAddr;
-    UINT8 infoBuf[512],*ptr;
-    //UINT8 *pInfo;
+    uint32_t blockCount, mmcSourceAddr;
+    uint8_t infoBuf[512],*ptr;
+    //uint8_t *pInfo;
 
-    //pInfo = (UINT8 *)((UINT32)infoBuf | NON_CACHE);
+    //pInfo = (uint8_t *)((uint32_t)infoBuf | NON_CACHE);
 
     /* set up interface */
     if (fmiInitSDDevice() < 0) {
@@ -1281,14 +1310,14 @@ int Burn_MMC(UINT32 len,UINT32 offset)
 
     /* check image 0 / offset 0 and back up */
     //if (pmmcImage->imageType == UBOOT)  // system image, burn nomal image
-    //    fmiSD_Read(MMC_INFO_SECTOR,1,(UINT32)pInfo);
+    //    fmiSD_Read(MMC_INFO_SECTOR,1,(uint32_t)pInfo);
 
     mmcSourceAddr = (DOWNLOAD_BASE | NON_CACHE);
-    ptr = (UINT8 *)mmcSourceAddr;
+    ptr = (uint8_t *)mmcSourceAddr;
     blockCount = (len+((SD_SECTOR)-1))/(SD_SECTOR);
     while(blockCount>=SD_MUL) {
-        MSG_DEBUG("offset=0x%08x,ptr_addr=0x%08x,ptr=%d\n",offset,(UINT32)ptr,*(ptr));
-        fmiSD_Write(offset,SD_MUL,(UINT32)ptr);
+        MSG_DEBUG("offset=0x%08x,ptr_addr=0x%08x,ptr=%d\n",offset,(uint32_t)ptr,*(ptr));
+        fmiSD_Write(offset,SD_MUL,(uint32_t)ptr);
         ptr+=(SD_SECTOR*SD_MUL);
         blockCount-=SD_MUL;
         offset+=SD_MUL;
@@ -1297,12 +1326,12 @@ int Burn_MMC(UINT32 len,UINT32 offset)
         SendAck((tmplen * 95) / len);
     }
     if(blockCount!=0) {
-        fmiSD_Write(offset,blockCount,(UINT32)ptr);
+        fmiSD_Write(offset,blockCount,(uint32_t)ptr);
     }
     /* restore image 0 and offset 0 */
     if (pmmcImage->imageType == 3) { // system image, burn nomal image
         if((pmmcImage)->macaddr[7]==1)
-            memcpy(infoBuf+0x190,(UCHAR *)((pmmcImage)->macaddr),6);  // MAC Address
+            memcpy(infoBuf+0x190,(uint8_t *)((pmmcImage)->macaddr),6);  // MAC Address
     }
 
     if ((pmmcImage->flashOffset != 2) || (pmmcImage->imageType == 3/*PARTITION*/)) {
@@ -1319,29 +1348,29 @@ int Burn_MMC(UINT32 len,UINT32 offset)
 void UXmodem_MMC()
 {
     int len,i, j, ret;
-    PMBR pmbr;
+    struct MBR* pmbr;
     unsigned char *ptr;
     unsigned char buf[80];
     unsigned char *_ch;
     unsigned int *_ack;
     unsigned int blockCount,offset=0;
-    PACK_HEAD pack;
-    PACK_CHILD_HEAD ppack;
+    struct PACK_HEAD pack;
+    struct PACK_CHILD_HEAD ppack;
     unsigned int ddrlen;
 
     MSG_DEBUG("download image to eMMC flash...\n");
     /* initial eMMC */
     fmiInitSDDevice();
 
-    memset((char *)&mmcImage, 0, sizeof(FW_MMC_IMAGE_T));
-    pmmcImage = (FW_MMC_IMAGE_T *)&mmcImage;
+    memset((char *)&mmcImage, 0, sizeof(struct FW_MMC_IMAGE));
+    pmmcImage = (struct FW_MMC_IMAGE *)&mmcImage;
     _ch=((unsigned char*)(((unsigned int)buf)|NON_CACHE));
     _ack=((unsigned int*)(((unsigned int)buf)|NON_CACHE));
     ptr=_ch;
     while(1) {
         if(Bulk_Out_Transfer_Size>0) {
-            usb_recv(ptr,sizeof(FW_MMC_IMAGE_T));
-            memcpy(pmmcImage,(unsigned char *)ptr,sizeof(FW_MMC_IMAGE_T));
+            usb_recv(ptr,sizeof(struct FW_MMC_IMAGE));
+            memcpy(pmmcImage,(unsigned char *)ptr,sizeof(struct FW_MMC_IMAGE));
             break;
         }
     }
@@ -1367,46 +1396,21 @@ void UXmodem_MMC()
             pmmcImage->flashOffset = 0x400;
             addMagicHeader(pmmcImage->executeAddr, pmmcImage->fileLength);
             ptr += 16;  // except the 16 bytes magic header
-#if 0
-            pmmcImage->executeAddr = 0x1200000;  /* 18MB */
-#endif
         }
         MSG_DEBUG("Bulk_Out_Transfer_Size pmmcImage->fileLength=0x%08x!!!\n",pmmcImage->fileLength);
-#if !defined(BATCH_BRUN)
-        do {
-            if(Bulk_Out_Transfer_Size>0) {
-
-                len=Bulk_Out_Transfer_Size;
-                MSG_DEBUG("usb_recv len=0x%08x!!!\n",len);
-                usb_recv(ptr,len);  //recv data from PC
-                ptr+=len;
-                *_ack=len;
-                MSG_DEBUG("usb_send *_ack=0x%08x!!!\n",*_ack);
-                usb_send((unsigned char*)_ack,4);//send ack to PC
-            }
-        } while((ptr-_ch)<(pmmcImage->fileLength+pmmcImage->initSize));
-#endif
         MSG_DEBUG("Burn_MMC!!!\n");
         if (pmmcImage->imageType == UBOOT) {
-#if !defined(BATCH_BRUN)
-            Burn_MMC(pmmcImage->fileLength+pmmcImage->initSize+16,(pmmcImage->flashOffset/SD_SECTOR));
-#else
             ret = BatchBurn_MMC(pmmcImage->fileLength+pmmcImage->initSize+16,(pmmcImage->flashOffset/SD_SECTOR),1);
             if(ret == 1) {
                 //sysprintf("XXXXX BatchBurn_MMC Device UBOOT image error !!! \n");
                 return;
             }
-#endif
         } else {
-#if !defined(BATCH_BRUN)
-            Burn_MMC(pmmcImage->fileLength,(pmmcImage->flashOffset/SD_SECTOR));
-#else
             ret = BatchBurn_MMC(pmmcImage->fileLength,(pmmcImage->flashOffset/SD_SECTOR),0);
             if(ret == 1) {
                 //sysprintf("XXXXX BatchBurn_MMC Device others image error !!! \n");
                 return;
             }
-#endif
         }
 
         break;
@@ -1450,48 +1454,26 @@ void UXmodem_MMC()
             blockCount = (pmmcImage->fileLength+16+pmmcImage->initSize+((SD_SECTOR)-1))/(SD_SECTOR);
         else
             blockCount = (pmmcImage->fileLength+((SD_SECTOR)-1))/(SD_SECTOR);
-#if !defined(BATCH_BRUN)
-        blockCount = (blockCount+8-1)/8;
-        offset = pmmcImage->flashOffset/SD_SECTOR;
-        while(blockCount) {
-            fmiSD_Read(offset,8,(UINT32)ptr);
-            ptr+=TRANSFER_LEN;
-            MSG_DEBUG("offset=0x%08x,ptr_addr=0x%08x,ptr=%d\n",offset,(UINT32)ptr,*(ptr));
-            offset+=8;
-            blockCount--;
-        }
-
-        ptr=_ch;
-        if(pmmcImage->imageType==UBOOT)
-            ptr+=(16+pmmcImage->initSize);
-        len=pmmcImage->fileLength;
-        while(len>0) {
-            usb_send(ptr,TRANSFER_LEN); //send data to PC
-            usb_recv((unsigned char*)_ack,4);   //recv data from PC
-            ptr+=TRANSFER_LEN;
-            len-=TRANSFER_LEN;
-        }
-#else
         ptr=_ch;
         len=pmmcImage->fileLength;
         blockCount = (blockCount+8-1)/8;
         offset = pmmcImage->flashOffset/SD_SECTOR;
 
         if(pmmcImage->imageType==UBOOT) {
-            fmiSD_Read(offset,8,(UINT32)ptr);
+            fmiSD_Read(offset,8,(uint32_t)ptr);
             offset+=8;
             if(blockCount==1) {
                 ptr=_ch+(16+pmmcImage->initSize);
                 usb_send(ptr,TRANSFER_LEN); //send data to PC
                 usb_recv((unsigned char*)_ack,4);   //recv data from PC
             } else {
-                INT32 mvlen,tranferlen;
+                int32_t mvlen,tranferlen;
                 tranferlen=len;
                 mvlen=(8*SD_SECTOR)-(16+pmmcImage->initSize);
                 memmove(_ch,_ch+(16+pmmcImage->initSize),mvlen);
                 for(i=1; i<blockCount; i++) {
                     ptr=_ch+mvlen;
-                    fmiSD_Read(offset,8,(UINT32)ptr);
+                    fmiSD_Read(offset,8,(uint32_t)ptr);
                     ptr=_ch;
                     usb_send(ptr,TRANSFER_LEN); //send data to PC
 					while(Bulk_Out_Transfer_Size==0) {}
@@ -1509,7 +1491,7 @@ void UXmodem_MMC()
             }
         } else {
             for(i=0; i<blockCount; i++) {
-                fmiSD_Read(offset,8,(UINT32)ptr);
+                fmiSD_Read(offset,8,(uint32_t)ptr);
                 usb_send(ptr,TRANSFER_LEN); //send data to PC
 				while(Bulk_Out_Transfer_Size==0) {}
                 usb_recv((unsigned char*)_ack,4);   //recv data from PC
@@ -1518,7 +1500,6 @@ void UXmodem_MMC()
                 MSG_DEBUG("blockCount:0x%08x\n",blockCount);
             }
         }
-#endif
     }
     break;
     case PACK_VERIFY_MODE: { // verify
@@ -1537,9 +1518,9 @@ void UXmodem_MMC()
         for(j=0; j<pmmcImage->imageNo; j++) {
             MSG_DEBUG("loop %d:  pmmcImage->imageNo = %d,  initSize=0x%08x\n", j, pmmcImage->imageNo, pmmcImage->initSize);
             while(1) {
-                if(Bulk_Out_Transfer_Size>=sizeof(PACK_CHILD_HEAD)) {
-                    usb_recv(ptr,sizeof(PACK_CHILD_HEAD));
-                    memcpy(&ppack,(unsigned char *)ptr,sizeof(PACK_CHILD_HEAD));
+                if(Bulk_Out_Transfer_Size>=sizeof(struct PACK_CHILD_HEAD)) {
+                    usb_recv(ptr,sizeof(struct PACK_CHILD_HEAD));
+                    memcpy(&ppack,(unsigned char *)ptr,sizeof(struct PACK_CHILD_HEAD));
                     usleep(1000);
                     *_ack=(USBD_BURN_TYPE | USBD_FLASH_MMC);
                     usb_send((unsigned char*)_ack,4);//send ack to PC
@@ -1578,7 +1559,7 @@ void UXmodem_MMC()
             blockCount = (blockCount+8-1)/8;
             offset = pmmcImage->flashOffset/SD_SECTOR;
             if(pmmcImage->imageType==UBOOT) {
-                fmiSD_Read(offset,8,(UINT32)ptr);
+                fmiSD_Read(offset,8,(uint32_t)ptr);
                 offset+=8;
                 if(blockCount==1) {
                     ptr=_ch+(16+pmmcImage->initSize);
@@ -1586,7 +1567,7 @@ void UXmodem_MMC()
                     while(Bulk_Out_Transfer_Size==0) {}
                     usb_recv((unsigned char*)_ack,4);   //recv data from PC
                 } else {
-                    INT32 mvlen,tranferlen;
+                    int32_t mvlen,tranferlen;
                     tranferlen=len;
                     mvlen=(8*SD_SECTOR)-(16+pmmcImage->initSize)-ddrlen;
                     memmove(_ch,_ch+(16+pmmcImage->initSize)+ddrlen,mvlen);
@@ -1596,7 +1577,7 @@ void UXmodem_MMC()
                     // MSG_DEBUG("(8*SD_SECTOR)-(16+pmmcImage->initSize) = %d\n", (8*SD_SECTOR)-(16+pmmcImage->initSize));
                     for(i=1; i<blockCount; i++) {
                         ptr=_ch+mvlen;
-                        fmiSD_Read(offset,8,(UINT32)ptr);
+                        fmiSD_Read(offset,8,(uint32_t)ptr);
                         MSG_DEBUG("blockCount = %d, mvlen = %d, ptr[0~3] = 0x%x  0x%x  0x%x  0x%x, offset =%d\n",
                                   blockCount, mvlen, ptr[0], ptr[1], ptr[2], ptr[3], offset);
                         ptr=_ch;
@@ -1616,7 +1597,7 @@ void UXmodem_MMC()
                 }
             } else {
                 for(i=0; i<blockCount; i++) {
-                    fmiSD_Read(offset,8,(UINT32)ptr);
+                    fmiSD_Read(offset,8,(uint32_t)ptr);
                     usb_send(ptr,TRANSFER_LEN); //send data to PC
                     while(Bulk_Out_Transfer_Size==0) {}
                     usb_recv((unsigned char*)_ack,4);   //recv data from PC
@@ -1628,8 +1609,8 @@ void UXmodem_MMC()
     break;
     case FORMAT_MODE: { /* Format */
         unsigned int *ptr;
-        UCHAR _fmi_ucBuffer[512];
-        ptr = (unsigned int *)((UINT32)_fmi_ucBuffer | 0x80000000);
+        uint8_t _fmi_ucBuffer[512];
+        ptr = (unsigned int *)((uint32_t)_fmi_ucBuffer | 0x80000000);
         MSG_DEBUG("eMMC format !!!\n");
 
         /* for debug or delay */
@@ -1646,10 +1627,6 @@ void UXmodem_MMC()
                   pmmcImage->Partition3Size, pmmcImage->PartitionS3Size, pmmcImage->Partition4Size, pmmcImage->PartitionS4Size);
         if(eMMCBlockSize>0)
         {
-            //pmbr=create_mbr(eMMCBlockSize,pmmcImage->ReserveSize);
-            //FormatFat32(pmbr,0);
-            //pmbr=create_mbr(eMMCBlockSize, pmmcImage);
- 
             if(pmmcImage->Partition2Size == 0 && pmmcImage->Partition3Size == 0 && pmmcImage->Partition4Size == 0)
             {
                 sysprintf("FORMAT_MODE PartitionNum =%d, P1=%d MB(0x%x) P2=%d MB(0x%x) P3=%d MB(0x%x) P4=%d MB(0x%x)\n", pmmcImage->PartitionNum, pmmcImage->Partition1Size, pmmcImage->PartitionS1Size, pmmcImage->Partition2Size, pmmcImage->PartitionS2Size,
@@ -1690,11 +1667,11 @@ void UXmodem_MMC()
                 }
             }
 
-            fmiSD_Read(MMC_INFO_SECTOR,1,(UINT32)ptr);
+            fmiSD_Read(MMC_INFO_SECTOR,1,(uint32_t)ptr);
             *(ptr+125)=0x11223344;
             *(ptr+126)=pmmcImage->ReserveSize;
             *(ptr+127)=0x44332211;
-            fmiSD_Write(MMC_INFO_SECTOR,1,(UINT32)ptr);
+            fmiSD_Write(MMC_INFO_SECTOR,1,(uint32_t)ptr);
             MSG_DEBUG("#1524 \n");
             SendAck(100);
             MSG_DEBUG("#1526 \n");
@@ -1723,8 +1700,8 @@ void UXmodem_MMC()
         MSG_DEBUG("Read Total blockCount:%d\n",blockCount);
         while(blockCount) {
 
-            fmiSD_Read(offset,8,(UINT32)ptr);
-            MSG_DEBUG("offset=0x%08x,ptr_addr=0x%08x,ptr=%d\n",offset,(UINT32)ptr,*(ptr));
+            fmiSD_Read(offset,8,(uint32_t)ptr);
+            MSG_DEBUG("offset=0x%08x,ptr_addr=0x%08x,ptr=%d\n",offset,(uint32_t)ptr,*(ptr));
             offset+=8;
             blockCount--;
             usb_send(ptr,4096); //send data to PC
@@ -1748,13 +1725,13 @@ void UXmodem_MMC()
         _ch=((unsigned char*)(((unsigned int)DOWNLOAD_BASE)|NON_CACHE));
         ptr=_ch;
         {
-            PACK_HEAD pack;
-            PACK_CHILD_HEAD ppack;
+            struct PACK_HEAD pack;
+            struct PACK_CHILD_HEAD ppack;
             while(1) {
-                if(Bulk_Out_Transfer_Size>=sizeof(PACK_HEAD)) {
-                    usb_recv(ptr,sizeof(PACK_HEAD));
-                    memcpy(&pack,(unsigned char *)ptr,sizeof(PACK_HEAD));
-                    *_ack=sizeof(PACK_HEAD);
+                if(Bulk_Out_Transfer_Size>=sizeof(struct PACK_HEAD)) {
+                    usb_recv(ptr,sizeof(struct PACK_HEAD));
+                    memcpy(&pack,(unsigned char *)ptr,sizeof(struct PACK_HEAD));
+                    *_ack=sizeof(struct PACK_HEAD);
                     usb_send((unsigned char*)_ack,4);//send ack to PC
                     break;
                 }
@@ -1762,31 +1739,15 @@ void UXmodem_MMC()
             MSG_DEBUG("pack.actionFlag=0x%x, pack.fileLength=0x%08x pack.num=%d!!!\n",pack.actionFlag,pack.fileLength,pack.num);
             for(i=0; i<pack.num; i++) {
                 while(1) {
-                    if(Bulk_Out_Transfer_Size>=sizeof(PACK_CHILD_HEAD)) {
-                        usb_recv(ptr,sizeof(PACK_CHILD_HEAD));
-                        memcpy(&ppack,(unsigned char *)ptr,sizeof(PACK_CHILD_HEAD));
-                        *_ack=sizeof(PACK_CHILD_HEAD);
+                    if(Bulk_Out_Transfer_Size>=sizeof(struct PACK_CHILD_HEAD)) {
+                        usb_recv(ptr,sizeof(struct PACK_CHILD_HEAD));
+                        memcpy(&ppack,(unsigned char *)ptr,sizeof(struct PACK_CHILD_HEAD));
+                        *_ack=sizeof(struct PACK_CHILD_HEAD);
                         usb_send((unsigned char*)_ack,4);//send ack to PC
                         break;
                     }
                 }
                 MSG_DEBUG("ppack.filelen=0x%x, ppack.startaddr=0x%08x!!!\n",ppack.filelen,ppack.startaddr);
-#if !defined(BATCH_BRUN)
-                ptr=_ch;
-                do {
-                    //if(Bulk_Out_Transfer_Size>=MIN(4096,ppack.filelen))
-                    if(Bulk_Out_Transfer_Size>0) {
-                        len=Bulk_Out_Transfer_Size;
-                        usb_recv(ptr,len);  //recv data from PC
-                        ptr+=len;
-                        *_ack=len;
-                        usb_send((unsigned char*)_ack,4);//send ack to PC
-                    }
-                } while((ptr-_ch)<ppack.filelen);
-#endif
-#if !defined(BATCH_BRUN)
-                Burn_MMC(ppack.filelen,ppack.startaddr/SD_SECTOR);
-#else
                 MSG_DEBUG("ppack.imagetype:%d\n", ppack.imagetype);
                 if(ppack.imagetype!=PMTP) {
                     if(ppack.imagetype!=PARTITION)
@@ -1798,8 +1759,8 @@ void UXmodem_MMC()
                     else
                         continue;
                 } else { /* if(ppack.imagetype==PMTP) */
-                    UINT32 m_mtp_mode,m_mtp_option,m_mtp_encrypt,m_mtp_enable,j;
-                    FW_OTP_IMAGE_T MTPImage;
+                    uint32_t m_mtp_mode,m_mtp_option,m_mtp_encrypt,m_mtp_enable,j;
+                    struct FW_OTP_IMAGE MTPImage;
                     m_mtp_mode=PACK_Mode(ppack.startaddr);
                     m_mtp_option=PACK_Option(ppack.startaddr);
                     m_mtp_encrypt=PACK_Encrypt(ppack.startaddr);
@@ -1824,13 +1785,12 @@ void UXmodem_MMC()
                     for(j=0; j<8; j++)
                         MSG_DEBUG("KeyMTP[%d] = 0x%08x \n",j, MTPImage.KeyOTP[j]);
                     if(!MTP_IsLock()) {
-                        MTP_Program_Key((UINT8 *)(&MTPImage.KeyOTP[0]),MTPImage.KeyLen,MTPImage.Option,MTPImage.Mode);
+                        MTP_Program_Key((uint8_t *)(&MTPImage.KeyOTP[0]),MTPImage.KeyLen,MTPImage.Option,MTPImage.Mode);
                         if(MTPImage.Lock==1)
                             MTP_Lock();
                     }
                     SendAck(100);
                 }
-#endif
             }
         }
     }
@@ -1845,22 +1805,20 @@ void UXmodem_MMC()
  *  NAND Functions
  *
  ******************************************************************************/
-FW_NAND_IMAGE_T nandImage;
-FW_NAND_IMAGE_T *pNandImage;
+struct FW_NAND_IMAGE nandImage;
+struct FW_NAND_IMAGE *pNandImage;
 
-void Burn_NAND_RAW(UINT32 len, UINT8 *ptr)
+void Burn_NAND_RAW(uint32_t len, uint8_t *ptr)
 {
     MSG_DEBUG("len=%d\n",len);
 }
 
-void Read_NAND_RAW(UINT32 len, UINT8 *ptr)
+void Read_NAND_RAW(uint32_t len, uint8_t *ptr)
 {
     MSG_DEBUG("len=%d\n", len);
 }
 
-#define DISABLE_YAFFS2
-#if defined(BATCH_BRUN)
-int BatchBurn_NAND(UINT32 len,UINT32 blockNo,UINT32 type)
+int BatchBurn_NAND(uint32_t len,uint32_t blockNo,uint32_t type)
 {
     int volatile status = 0;
     int volatile page_count, block_count, page, addr, blockNum, total;
@@ -1876,12 +1834,7 @@ int BatchBurn_NAND(UINT32 len,UINT32 blockNo,UINT32 type)
     _ack=((unsigned int*)(((unsigned int)ack)|NON_CACHE));
     ptr=_ch;
 
-#ifndef DISABLE_YAFFS2
-    if(type==YAFFS2 && (len%512)!=0)
-        sparesize=pSM->uSpareSize;
-    else
-#endif
-        sparesize=0;
+    sparesize=0;
 
     page_count = len / (pSM->uPageSize+sparesize);
     if(len%(pSM->uPageSize+sparesize)!=0) page_count++;
@@ -1931,22 +1884,13 @@ _retry_1:
         }
         // write block
         for (i=0; i<pSM->uPagePerBlock; i++) {
-#ifndef DISABLE_YAFFS2
-            if(type==YAFFS2 && (len%512)!=0) {
-                status = fmiSM_Write_large_page_oob(page+i, 0, addr,pSM->uSpareSize);
-            } else
-#endif
-                status = fmiSM_Write_large_page(page+i, 0, addr);
+            status = fmiSM_Write_large_page(page+i, 0, addr);
             if (status != 0) {
                 fmiMarkBadBlock(pSM, blockNum);
                 blockNum++;
                 goto _retry_1;
             }
             addr += pSM->uPageSize;
-#ifndef DISABLE_YAFFS2
-            if(type==YAFFS2 && (len%512)!=0)
-                addr += (pSM->uPageSize>>5);
-#endif
             pagetmp++;
             //SendAck((pagetmp * 95) / total);
         }
@@ -1990,12 +1934,7 @@ _retry_2:
         MSG_DEBUG("page_count=%d,type=%d\n",page_count,type);
         for (i=0; i<page_count; i++) {
             MSG_DEBUG("i=%d\n",i);
-#ifndef DISABLE_YAFFS2
-            if(type==YAFFS2 && (len%512)!=0)
-                status = fmiSM_Write_large_page_oob(page+i, 0, addr,pSM->uPageSize>>5);
-            else
-#endif
-                status = fmiSM_Write_large_page(page+i, 0, addr);
+            status = fmiSM_Write_large_page(page+i, 0, addr);
 
             if (status != 0) {
                 fmiMarkBadBlock(pSM, blockNum);
@@ -2003,10 +1942,6 @@ _retry_2:
                 goto _retry_2;
             }
             addr += pSM->uPageSize;
-#ifndef DISABLE_YAFFS2
-            if(type==YAFFS2 && (len%512)!=0)
-                addr += (pSM->uPageSize>>5);
-#endif
             pagetmp++;
             //SendAck((pagetmp * 95) / total);
         }
@@ -2017,10 +1952,9 @@ _retry_2:
     SendAck(blockNum-blockNo);
     return status;
 }
-#endif
 
 
-int BatchBurn_NAND_Data_OOB(UINT32 len,UINT32 blockNo,UINT32 type)
+int BatchBurn_NAND_Data_OOB(uint32_t len,uint32_t blockNo,uint32_t type)
 {
     int volatile status = 0;
     int volatile page_count, block_count, page, addr, blockNum, total;
@@ -2066,33 +2000,24 @@ int BatchBurn_NAND_Data_OOB(UINT32 len,UINT32 blockNo,UINT32 type)
         } while(remainlen!=0);
 
         MSG_DEBUG("remainlen OK\n");
-//_retry_1:
         addr = address | NON_CACHE;
         page = pSM->uPagePerBlock * (blockNum);
         status = fmiSM_BlockEraseBad(pSM, blockNum); // block erase
         // write block
         for (i=0; i<pSM->uPagePerBlock; i++) {
             status = fmiSM_Write_large_page_oob2(page+i, 0, addr);
-//             if (status != 0)
-//             {
-//                 fmiMarkBadBlock(pSM, blockNum);
-//                 blockNum++;
-//                 goto _retry_1;
-//             }
             addr += pSM->uPageSize+sparesize;
             pagetmp++;
-            //SendAck((pagetmp * 95) / total);
         }
         blockNum++;
     }
     MSG_DEBUG("page_count=%d,pSM->uPagePerBlock=%d\n",page_count,pSM->uPagePerBlock);
 
-    //SendAck(100);
     SendAck(blockNum-blockNo);
     return status;
 }
 
-int Burn_NAND(UINT32 len,UINT32 blockNo,UINT32 type)
+int Burn_NAND(uint32_t len,uint32_t blockNo,uint32_t type)
 {
     int volatile status = 0;
     int volatile page_count, block_count, page, addr, blockNum, total;
@@ -2136,12 +2061,7 @@ _retry_1:
 
         // write block
         for (i=0; i<pSM->uPagePerBlock; i++) {
-#ifndef DISABLE_YAFFS2
-            if(type==YAFFS2 && (len%512)!=0) {
-                status = fmiSM_Write_large_page_oob(page+i, 0, addr,pSM->uSpareSize);
-            } else
-#endif
-                status = fmiSM_Write_large_page(page+i, 0, addr);
+            status = fmiSM_Write_large_page(page+i, 0, addr);
 
             if (status != 0) {
                 fmiMarkBadBlock(pSM, blockNum);
@@ -2150,11 +2070,6 @@ _retry_1:
                 goto _retry_1;
             }
             addr += pSM->uPageSize;
-#ifndef DISABLE_YAFFS2
-            if(type==YAFFS2 && (len%512)!=0)
-                addr += (pSM->uPageSize>>5);
-#endif
-
             pagetmp++;
             SendAck((pagetmp * 95) / total);
         }
@@ -2176,12 +2091,7 @@ _retry_2:
 
         // write block
         for (i=0; i<page_count; i++) {
-#ifndef DISABLE_YAFFS2
-            if(type==YAFFS2 && (len%512)!=0)
-                status = fmiSM_Write_large_page_oob(page+i, 0, addr,pSM->uPageSize>>5);
-            else
-#endif
-                status = fmiSM_Write_large_page(page+i, 0, addr);
+            status = fmiSM_Write_large_page(page+i, 0, addr);
 
             if (status != 0) {
                 fmiMarkBadBlock(pSM, blockNum);
@@ -2190,10 +2100,6 @@ _retry_2:
                 goto _retry_2;
             }
             addr += pSM->uPageSize;
-#ifndef DISABLE_YAFFS2
-            if(type==YAFFS2 && (len%512)!=0)
-                addr += (pSM->uPageSize>>5);
-#endif
             pagetmp++;
             SendAck((pagetmp * 95) / total);
         }
@@ -2205,7 +2111,7 @@ _retry_2:
     return status;
 }
 
-int Read_Nand(UINT32 dst_adr,UINT32 blockNo, UINT32 len)
+int Read_Nand(uint32_t dst_adr,uint32_t blockNo, uint32_t len)
 {
     volatile char *ptr;
     int spareSize;
@@ -2229,7 +2135,7 @@ int Read_Nand(UINT32 dst_adr,UINT32 blockNo, UINT32 len)
                 fmiSM_Read_RA(page_no, pSM->uPageSize);
                 for (k=0; k<spareSize; k++)
                     *ptr++ = inpw(REG_SMDATA) & 0xff;                   // copy RA data from NAND to SMRA by SW
-                fmiSM_Read_large_page(pSM, page_no, (UINT32)dst_adr);
+                fmiSM_Read_large_page(pSM, page_no, (uint32_t)dst_adr);
                 dst_adr += pSM->uPageSize;
                 count -= pSM->uPageSize;
             }
@@ -2244,7 +2150,7 @@ int Read_Nand(UINT32 dst_adr,UINT32 blockNo, UINT32 len)
     return 0;
 }
 
-int Read_Nand_Redunancy(UINT32 dst_adr,UINT32 blockNo, UINT32 len)
+int Read_Nand_Redunancy(uint32_t dst_adr,uint32_t blockNo, uint32_t len)
 {
     volatile char *ptr;
     volatile char *dst_redunancy_adr;
@@ -2274,7 +2180,7 @@ int Read_Nand_Redunancy(UINT32 dst_adr,UINT32 blockNo, UINT32 len)
                 *ptr++ = *dst_redunancy_adr;
                 dst_redunancy_adr++;
             }
-            fmiSM_Read_large_page(pSM, page_no, (UINT32)dst_adr);
+            fmiSM_Read_large_page(pSM, page_no, (uint32_t)dst_adr);
             dst_adr += (pSM->uPageSize+pSM->uSpareSize);
             count -= (pSM->uPageSize+pSM->uSpareSize);
         }
@@ -2285,8 +2191,8 @@ int Read_Nand_Redunancy(UINT32 dst_adr,UINT32 blockNo, UINT32 len)
     }
     return 0;
 }
-#if defined(BATCH_BRUN)
-int BatchBurn_NAND_BOOT(UINT32 len,UINT32 blockNo,UINT32 blockLen,UINT32 HeaderFlag)
+
+int BatchBurn_NAND_BOOT(uint32_t len,uint32_t blockNo,uint32_t blockLen,uint32_t HeaderFlag)
 {
     int volatile status = 0;
     int volatile page_count, block_count, page, addr, blockNum, total;
@@ -2320,57 +2226,6 @@ int BatchBurn_NAND_BOOT(UINT32 len,UINT32 blockNo,UINT32 blockLen,UINT32 HeaderF
     // erase needed blocks
     block_count = page_count / pSM->uPagePerBlock;
 
-//   for (j=0; j<block_count; j++)
-//   {
-//       ptr=_ch+headlen;
-//       remainlen=(pSM->uPagePerBlock*(pSM->uPageSize));
-//       do{
-//         if(Bulk_Out_Transfer_Size>0)
-//         {
-//             reclen=MIN(Bulk_Out_Transfer_Size,remainlen);
-//             usb_recv(ptr,reclen);  //recv data from PC
-//             ptr+=reclen;
-//             remainlen-=reclen;
-//             *_ack=reclen|((pagetmp * 95) / total)<<16;
-//
-//             usb_send((unsigned char*)_ack,4);//send ack to PC
-//         }
-//       }while(remainlen!=0);
-//     // block erase
-// //_retry_1:
-//     for(blkindx=blockNum;blkindx<blockLen;blkindx++)
-//     {
-//       addr = address | NON_CACHE;
-//       page = pSM->uPagePerBlock * (blkindx);
-//       status = fmiSM_BlockErase(pSM, blkindx);
-//       if (status != 0)
-//       {
-//          fmiMarkBadBlock(pSM, blkindx);
-//          MSG_DEBUG("bad block = %d\n",blkindx);
-//          //blockNum++;
-//          continue;
-//       }
-
-//       // write block
-//       for (i=0; i<pSM->uPagePerBlock; i++)
-//       {
-//         status = fmiSM_Write_large_page(page+i, 0, addr);
-//         if (status != 0)
-//         {
-//           fmiMarkBadBlock(pSM, blkindx);
-//           MSG_DEBUG("bad block = %d\n",blkindx);
-//           //blockNum++;
-//           addr = (address + j * pSM->uPagePerBlock * pSM->uPageSize) | NON_CACHE;
-//           continue;
-//         }
-//         addr += pSM->uPageSize;
-//         pagetmp++;
-//       }
-//     }
-//     blockNum++;
-//     memcpy(_ch,_ch+(pSM->uPagePerBlock * pSM->uPageSize),headlen);
-//   }
-
     if (page_count <= pSM->uPagePerBlock) {
         //page_count = page_count - block_count * pSM->uPagePerBlock;
         memset(_ch+headlen,0xff,pSM->uPagePerBlock*(pSM->uPageSize));
@@ -2388,15 +2243,12 @@ int BatchBurn_NAND_BOOT(UINT32 len,UINT32 blockNo,UINT32 blockLen,UINT32 HeaderF
             }
         } while(remainlen!=0);
         // erase block
-//_retry_2:
         for(blkindx=blockNum; blkindx<blockLen; blkindx++) {
             addr = address | NON_CACHE;
             page = pSM->uPagePerBlock * (blkindx);
             status = fmiSM_BlockErase(pSM, blkindx);
             if (status != 0) {
                 fmiMarkBadBlock(pSM, blkindx);
-                //blockNum++;
-                //goto _retry_2;
                 continue;
             }
 
@@ -2405,9 +2257,7 @@ int BatchBurn_NAND_BOOT(UINT32 len,UINT32 blockNo,UINT32 blockLen,UINT32 HeaderF
                 status = fmiSM_Write_large_page(page+i, 0, addr);
                 if (status != 0) {
                     fmiMarkBadBlock(pSM, blkindx);
-                    //blockNum++;
                     addr = (address + block_count * pSM->uPagePerBlock * pSM->uPageSize) | NON_CACHE;
-                    //goto _retry_2;
                     continue;
                 }
                 addr += pSM->uPageSize;
@@ -2425,9 +2275,8 @@ int BatchBurn_NAND_BOOT(UINT32 len,UINT32 blockNo,UINT32 blockLen,UINT32 HeaderF
     SendAck(block_count+blockLen);
     return status;
 }
-#endif
 
-int Burn_NAND_BACKUP(UINT32 len,UINT32 blockNo)
+int Burn_NAND_BACKUP(uint32_t len,uint32_t blockNo)
 {
     int volatile status = 0;
     int volatile page_count, block_count, page, addr, blockNum, total;
@@ -2516,8 +2365,8 @@ void UXmodem_NAND()
     unsigned int *_ack;
     unsigned int len;
     unsigned int remainlen;
-    PACK_HEAD pack;
-    PACK_CHILD_HEAD ppack;
+    struct PACK_HEAD pack;
+    struct PACK_CHILD_HEAD ppack;
     unsigned int ddrlen;
 
     MSG_DEBUG("download image to NAND flash...\n");
@@ -2527,16 +2376,16 @@ void UXmodem_NAND()
     sysprintf("UXmodem_NAND BlockPerFlash=%d\n",pSM->uBlockPerFlash);
     sysprintf("UXmodem_NAND PagePerBlock=%d\n",pSM->uPagePerBlock);
     sysprintf("UXmodem_NAND PageSize=%d\n",pSM->uPageSize);
-    memset((char *)&nandImage, 0, sizeof(FW_NAND_IMAGE_T));
-    pNandImage = (FW_NAND_IMAGE_T *)&nandImage;
+    memset((char *)&nandImage, 0, sizeof(struct FW_NAND_IMAGE));
+    pNandImage = (struct FW_NAND_IMAGE *)&nandImage;
 
     _ch=((unsigned char*)(((unsigned int)buf)|NON_CACHE));
     _ack=((unsigned int*)(((unsigned int)buf)|NON_CACHE));
     ptr=_ch;
     while(1) {
         if(Bulk_Out_Transfer_Size>0) {
-            usb_recv(ptr,sizeof(FW_NAND_IMAGE_T));
-            memcpy(pNandImage, (unsigned char *)ptr, sizeof(FW_NAND_IMAGE_T));
+            usb_recv(ptr,sizeof(struct FW_NAND_IMAGE));
+            memcpy(pNandImage, (unsigned char *)ptr, sizeof(struct FW_NAND_IMAGE));
             break;
         }
     }
@@ -2565,54 +2414,23 @@ void UXmodem_NAND()
             offset = 0;
 
         len=pSM->uPagePerBlock*pSM->uPageSize;
-#if !defined(BATCH_BRUN)
-        do {
-            if(Bulk_Out_Transfer_Size>0) {
-                len=Bulk_Out_Transfer_Size;
-                usb_recv(ptr,len);  //recv data from PC
-                ptr+=len;
-                *_ack=len;
-                usb_send((unsigned char*)_ack,4);//send ack to PC
-            }
-            //MSG_DEBUG("%d\n",(ptr-_ch));
-        } while((ptr-_ch)<(pNandImage->fileLength + offset + pNandImage->initSize));
-#endif
         MSG_DEBUG("NAND normal Burn_NAND !!!\n");
         if (pNandImage->imageType == UBOOT) {   // system image
-#if !defined(BATCH_BRUN)
-            for(i=1; i<4; i++)
-                Burn_NAND_BACKUP(pNandImage->fileLength + offset +((FW_NAND_IMAGE_T *)pNandImage)->initSize,i);
-            Burn_NAND(pNandImage->fileLength + offset +((FW_NAND_IMAGE_T *)pNandImage)->initSize,0,pNandImage->imageType);
-#else
-            BatchBurn_NAND_BOOT(pNandImage->fileLength + offset +((FW_NAND_IMAGE_T *)pNandImage)->initSize,0,4,1);
-#endif
+            BatchBurn_NAND_BOOT(pNandImage->fileLength + offset +((struct FW_NAND_IMAGE *)pNandImage)->initSize,0,4,1);
         } else {
             if(pNandImage->imageType!=IMAGE) {
                 if(pNandImage->imageType == DATA_OOB) {
                     MSG_DEBUG("DATA_OOB type\n");
-                    BatchBurn_NAND_Data_OOB(pNandImage->fileLength + offset +((FW_NAND_IMAGE_T *)pNandImage)->initSize,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),pNandImage->imageType);
+                    BatchBurn_NAND_Data_OOB(pNandImage->fileLength + offset +((struct FW_NAND_IMAGE *)pNandImage)->initSize,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),pNandImage->imageType);
                 } else {
-#if !defined(BATCH_BRUN)
-                    Burn_NAND(pNandImage->fileLength + offset +((FW_NAND_IMAGE_T *)pNandImage)->initSize,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),pNandImage->imageType);
-                    Burn_NAND(pNandImage->fileLength + offset +((FW_NAND_IMAGE_T *)pNandImage)->initSize,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),pNandImage->imageType);
-#else
-                    BatchBurn_NAND(pNandImage->fileLength + offset +((FW_NAND_IMAGE_T *)pNandImage)->initSize,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),pNandImage->imageType);
-#endif
+                    BatchBurn_NAND(pNandImage->fileLength + offset +((struct FW_NAND_IMAGE *)pNandImage)->initSize,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),pNandImage->imageType);
                 }
             } else {
                 MSG_DEBUG("_ch[0]=%c,_ch[1]=%c,_ch[2]=%c,_ch[3]=%c\n",(char)_ch[0],(char)_ch[1],(char)_ch[2],(char)_ch[3]);
                 if(((char)_ch[0])=='U' && ((char)_ch[1])=='B' && ((char)_ch[2])=='I') {
-#if !defined(BATCH_BRUN)
-                    Burn_NAND(pNandImage->fileLength + offset +((FW_NAND_IMAGE_T *)pNandImage)->initSize,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),UBIFS);
-#else
-                    BatchBurn_NAND(pNandImage->fileLength + offset +((FW_NAND_IMAGE_T *)pNandImage)->initSize,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),UBIFS);
-#endif
+                    BatchBurn_NAND(pNandImage->fileLength + offset +((struct FW_NAND_IMAGE *)pNandImage)->initSize,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),UBIFS);
                 } else {
-#if !defined(BATCH_BRUN)
-                    Burn_NAND(pNandImage->fileLength + offset +((FW_NAND_IMAGE_T *)pNandImage)->initSize,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),YAFFS2);
-#else
-                    BatchBurn_NAND(pNandImage->fileLength + offset +((FW_NAND_IMAGE_T *)pNandImage)->initSize,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),YAFFS2);
-#endif
+                    BatchBurn_NAND(pNandImage->fileLength + offset +((struct FW_NAND_IMAGE *)pNandImage)->initSize,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),YAFFS2);
                 }
             }
         }
@@ -2672,66 +2490,46 @@ void UXmodem_NAND()
             *_ack=0x83;
             usb_send((unsigned char*)_ack,4);//send ack to PC
         }
-#if !defined(BATCH_BRUN)
-        _ch=((unsigned char*)(((unsigned int)DOWNLOAD_BASE)|NON_CACHE));
-        ptr=_ch;
         if (pNandImage->imageType == UBOOT) {   // system image
-            memset(ptr, 0, pNandImage->fileLength+16+pNandImage->initSize);
-            Read_Nand(DOWNLOAD_BASE,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),pNandImage->fileLength+16+pNandImage->initSize);
-            ptr+=(16+pNandImage->initSize);
+            int offblk=0;
+            _ch=((unsigned char*)(((unsigned int)DOWNLOAD_BASE)|NON_CACHE));
+            ptr=_ch;
+            while(fmiCheckInvalidBlock(pSM, pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize)+offblk) == 1) {
+                offblk++;
+            }
+            Read_Nand(DOWNLOAD_BASE,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize)+offblk,pNandImage->fileLength+16+pNandImage->initSize);
+            memmove(_ch,_ch+16+pNandImage->initSize,pNandImage->fileLength);
+            do {
+                usb_send(ptr,TRANSFER_LEN); //send data to PC
+                while(Bulk_Out_Transfer_Size==0) {}
+                usb_recv((unsigned char*)_ack,4); //recv data from PC
+                ptr += (*_ack);
+            } while((ptr-_ch)<(pNandImage->fileLength));
         } else {
-            memset(ptr, 0, pNandImage->fileLength);
-            Read_Nand(DOWNLOAD_BASE,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize),pNandImage->fileLength);
-        }
-        do {
-            usb_send(ptr,TRANSFER_LEN); //send data to PC
-            usb_recv((unsigned char*)_ack,4); //recv data from PC
-            ptr += (*_ack);
-        } while((ptr-_ch)<pNandImage->fileLength);
-#else
-        {
-            if (pNandImage->imageType == UBOOT) {   // system image
-                int offblk=0;
+            int total,offblk=0;
+            total=pNandImage->fileLength;
+            do {
                 _ch=((unsigned char*)(((unsigned int)DOWNLOAD_BASE)|NON_CACHE));
                 ptr=_ch;
+                len=MIN(total,pSM->uPagePerBlock*pSM->uPageSize);
+                memset(ptr, 0xff, pSM->uPagePerBlock*pSM->uPageSize);
                 while(fmiCheckInvalidBlock(pSM, pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize)+offblk) == 1) {
                     offblk++;
                 }
-                Read_Nand(DOWNLOAD_BASE,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize)+offblk,pNandImage->fileLength+16+pNandImage->initSize);
-                memmove(_ch,_ch+16+pNandImage->initSize,pNandImage->fileLength);
+                Read_Nand(DOWNLOAD_BASE,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize)+offblk,len);
+                MSG_DEBUG("Read_NAND offblk=%d,len=%d\n",offblk,len);
                 do {
                     usb_send(ptr,TRANSFER_LEN); //send data to PC
                     while(Bulk_Out_Transfer_Size==0) {}
                     usb_recv((unsigned char*)_ack,4); //recv data from PC
                     ptr += (*_ack);
-                } while((ptr-_ch)<(pNandImage->fileLength));
-            } else {
-                int total,offblk=0;
-                total=pNandImage->fileLength;
-                do {
-                    _ch=((unsigned char*)(((unsigned int)DOWNLOAD_BASE)|NON_CACHE));
-                    ptr=_ch;
-                    len=MIN(total,pSM->uPagePerBlock*pSM->uPageSize);
-                    memset(ptr, 0xff, pSM->uPagePerBlock*pSM->uPageSize);
-                    while(fmiCheckInvalidBlock(pSM, pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize)+offblk) == 1) {
-                        offblk++;
-                    }
-                    Read_Nand(DOWNLOAD_BASE,pNandImage->blockNo/(pSM->uPagePerBlock*pSM->uPageSize)+offblk,len);
-                    MSG_DEBUG("Read_NAND offblk=%d,len=%d\n",offblk,len);
-                    do {
-                        usb_send(ptr,TRANSFER_LEN); //send data to PC
-                        while(Bulk_Out_Transfer_Size==0) {}
-                        usb_recv((unsigned char*)_ack,4); //recv data from PC
-                        ptr += (*_ack);
-                        MSG_DEBUG("read size=0x%08x\n",(unsigned int)(ptr-_ch));
-                    } while((int)(ptr-_ch)<len);
-                    total-=len;
-                    offblk+=1;
-                    MSG_DEBUG("total=%d len=%d\n",total,len);
-                } while(total!=0);
-            }
+                    MSG_DEBUG("read size=0x%08x\n",(unsigned int)(ptr-_ch));
+                } while((int)(ptr-_ch)<len);
+                total-=len;
+                offblk+=1;
+                MSG_DEBUG("total=%d len=%d\n",total,len);
+            } while(total!=0);
         }
-#endif
     }
     break;
     case PACK_VERIFY_MODE: { // verify
@@ -2743,15 +2541,11 @@ void UXmodem_NAND()
             usb_send((unsigned char*)_ack,4);//send ack to PC
         }
 
-#if !defined(BATCH_BRUN)
-
-#else
-        //sysprintf("PACK_VERIFY_MODE  PACK_VERIFY_MODE  PACK_VERIFY_MODE pNandImage->imageNo= %d\n", pNandImage->imageNo);
         for(i=0; i<pNandImage->imageNo; i++) {
             while(1) {
-                if(Bulk_Out_Transfer_Size>=sizeof(PACK_CHILD_HEAD)) {
-                    usb_recv(ptr,sizeof(PACK_CHILD_HEAD));
-                    memcpy(&ppack,(unsigned char *)ptr,sizeof(PACK_CHILD_HEAD));
+                if(Bulk_Out_Transfer_Size>=sizeof(struct PACK_CHILD_HEAD)) {
+                    usb_recv(ptr,sizeof(struct PACK_CHILD_HEAD));
+                    memcpy(&ppack,(unsigned char *)ptr,sizeof(struct PACK_CHILD_HEAD));
                     usleep(1000);
                     *_ack=0x83;
                     usb_send((unsigned char*)_ack,4);//send ack to PC
@@ -2816,7 +2610,6 @@ void UXmodem_NAND()
                 } while(total!=0);
             }
         }
-#endif
     }
     break;
     case READ_MODE: { // read
@@ -2829,7 +2622,6 @@ void UXmodem_NAND()
         }
 
         MSG_DEBUG("offset=%d,blockNo=%d,fileLength=%d\n",offset,pNandImage->blockNo,pNandImage->fileLength);
-#if defined(BATCH_BRUN)
         {
             unsigned int total,offblk=0;
             total=pNandImage->fileLength;
@@ -2870,18 +2662,6 @@ void UXmodem_NAND()
                 }
             } while(total!=0);
         }
-#else
-        _ch=((unsigned char*)(((unsigned int)DOWNLOAD_BASE)|NON_CACHE));
-        ptr=_ch;
-        memset(ptr, 0, pNandImage->fileLength);
-        Read_Nand(DOWNLOAD_BASE,pNandImage->blockNo,pNandImage->fileLength);
-        do {
-            usb_send(ptr,4096);//send data to PC
-            while(Bulk_Out_Transfer_Size==0) {}
-            usb_recv((unsigned char*)_ack,4); //recv data from PC
-            ptr += (*_ack);
-        } while((ptr-_ch)<pNandImage->fileLength);
-#endif
     }
     break;
     case PACK_MODE: {
@@ -2896,13 +2676,13 @@ void UXmodem_NAND()
         _ch=((unsigned char*)(((unsigned int)DOWNLOAD_BASE)|NON_CACHE));
         ptr=_ch;
         {
-            PACK_HEAD pack;
-            PACK_CHILD_HEAD ppack;
+            struct PACK_HEAD pack;
+            struct PACK_CHILD_HEAD ppack;
             while(1) {
-                if(Bulk_Out_Transfer_Size>=sizeof(PACK_HEAD)) {
-                    usb_recv(ptr,sizeof(PACK_HEAD));
-                    memcpy(&pack,(unsigned char *)ptr,sizeof(PACK_HEAD));
-                    *_ack=sizeof(PACK_HEAD);
+                if(Bulk_Out_Transfer_Size>=sizeof(struct PACK_HEAD)) {
+                    usb_recv(ptr,sizeof(struct PACK_HEAD));
+                    memcpy(&pack,(unsigned char *)ptr,sizeof(struct PACK_HEAD));
+                    *_ack=sizeof(struct PACK_HEAD);
                     usb_send((unsigned char*)_ack,4);//send ack to PC
                     break;
                 }
@@ -2910,75 +2690,41 @@ void UXmodem_NAND()
             MSG_DEBUG("pack.actionFlag=0x%x, pack.fileLength=0x%08x pack.num=%d!!!\n",pack.actionFlag,pack.fileLength,pack.num);
             for(i=0; i<pack.num; i++) {
                 while(1) {
-                    if(Bulk_Out_Transfer_Size>=sizeof(PACK_CHILD_HEAD)) {
-                        usb_recv(ptr,sizeof(PACK_CHILD_HEAD));
-                        memcpy(&ppack,(unsigned char *)ptr,sizeof(PACK_CHILD_HEAD));
-                        *_ack=sizeof(PACK_CHILD_HEAD);
+                    if(Bulk_Out_Transfer_Size>=sizeof(struct PACK_CHILD_HEAD)) {
+                        usb_recv(ptr,sizeof(struct PACK_CHILD_HEAD));
+                        memcpy(&ppack,(unsigned char *)ptr,sizeof(struct PACK_CHILD_HEAD));
+                        *_ack=sizeof(struct PACK_CHILD_HEAD);
                         usb_send((unsigned char*)_ack,4);//send ack to PC
                         break;
                     }
                 }
                 MSG_DEBUG("%d ppack.filelen=0x%x, ppack.startaddr=0x%08x!!!\n",i,ppack.filelen,ppack.startaddr);
-#if !defined(BATCH_BRUN)
-                ptr=_ch;
-                do {
-                    if(Bulk_Out_Transfer_Size>0)
-                        //if(Bulk_Out_Transfer_Size>=MIN(4096,ppack.filelen))
-                    {
-                        len=Bulk_Out_Transfer_Size;
-                        usb_recv(ptr,len);  //recv data from PC
-                        ptr+=len;
-                        *_ack=len;
-                        usb_send((unsigned char*)_ack,4);//send ack to PC
-                    }
-                } while((ptr-_ch)<ppack.filelen);
-                MSG_DEBUG("ppack OK\n");
-#endif
                 if(ppack.imagetype!=PMTP) {
                     if(ppack.imagetype==UBOOT) {
-#if !defined(BATCH_BRUN)
-                        int j;
-                        for(j=1; j<4; j++)
-                            Burn_NAND_BACKUP(ppack.filelen,i);
-                        Burn_NAND(ppack.filelen,ppack.startaddr/(pSM->uPageSize*pSM->uPagePerBlock),pNandImage->imageType);
-#else
                         ret = BatchBurn_NAND_BOOT(ppack.filelen,0,4,0);
                         if(ret == -1) {
                             sysprintf("Nand Device image error !!! \n");
                             return;
                         }
-#endif
                     } else {
                         if(ppack.imagetype!=IMAGE) {
-#if !defined(BATCH_BRUN)
-                            Burn_NAND(ppack.filelen,ppack.startaddr/(pSM->uPageSize*pSM->uPagePerBlock),pNandImage->imageType);
-#else
                             BatchBurn_NAND(ppack.filelen,ppack.startaddr/(pSM->uPageSize*pSM->uPagePerBlock),pNandImage->imageType);
-#endif
                         } else {
                             MSG_DEBUG("_ch[0]=%c,_ch[1]=%c,_ch[2]=%c,_ch[3]=%c\n",(char)_ch[0],(char)_ch[1],(char)_ch[2],(char)_ch[3]);
                             if(((char)_ch[0])=='U' && ((char)_ch[1])=='B' && ((char)_ch[2])=='I') {
-#if !defined(BATCH_BRUN)
-                                Burn_NAND(ppack.filelen,ppack.startaddr/(pSM->uPageSize*pSM->uPagePerBlock),UBIFS);
-#else
                                 ret = BatchBurn_NAND(ppack.filelen,ppack.startaddr/(pSM->uPageSize*pSM->uPagePerBlock),UBIFS);
                                 if(ret == -1) {
                                     sysprintf("BatchBurn_NAND Device image error !!! \n");
                                     return;
                                 }
-#endif
                             } else {
-#if !defined(BATCH_BRUN)
-                                Burn_NAND(ppack.filelen,ppack.startaddr/(pSM->uPageSize*pSM->uPagePerBlock),YAFFS2);
-#else
                                 BatchBurn_NAND(ppack.filelen,ppack.startaddr/(pSM->uPageSize*pSM->uPagePerBlock),YAFFS2);
-#endif
                             }
                         }
                     }
                 } else { /* if(ppack.imagetype==PMTP) */
-                    UINT32 m_mtp_mode,m_mtp_option,m_mtp_encrypt,m_mtp_enable,j;
-                    FW_OTP_IMAGE_T MTPImage;
+                    uint32_t m_mtp_mode,m_mtp_option,m_mtp_encrypt,m_mtp_enable,j;
+                    struct FW_OTP_IMAGE MTPImage;
                     m_mtp_mode=PACK_Mode(ppack.startaddr);
                     m_mtp_option=PACK_Option(ppack.startaddr);
                     m_mtp_encrypt=PACK_Encrypt(ppack.startaddr);
@@ -3003,7 +2749,7 @@ void UXmodem_NAND()
                     for(j=0; j<8; j++)
                         MSG_DEBUG("KeyMTP[%d] = 0x%08x \n",j, MTPImage.KeyOTP[j]);
                     if(!MTP_IsLock()) {
-                        MTP_Program_Key((UINT8 *)(&MTPImage.KeyOTP[0]),MTPImage.KeyLen,MTPImage.Option,MTPImage.Mode);
+                        MTP_Program_Key((uint8_t *)(&MTPImage.KeyOTP[0]),MTPImage.KeyLen,MTPImage.Option,MTPImage.Mode);
                         if(MTPImage.Lock==1)
                             MTP_Lock();
                     }
@@ -3027,8 +2773,8 @@ void UXmodem_MTP()
     unsigned char buf[512];
     unsigned char *_ch;
     unsigned int *_ack;
-    FW_OTP_IMAGE_T OTPImage;
-    FW_OTP_IMAGE_T * pOTPImage;
+    struct FW_OTP_IMAGE OTPImage;
+    struct FW_OTP_IMAGE * pOTPImage;
     pOTPImage = &OTPImage;
 
     MSG_DEBUG("Download MTP KEY to Regsters...\n");
@@ -3039,8 +2785,8 @@ void UXmodem_MTP()
 
     while(1) {
         if(Bulk_Out_Transfer_Size>0) {
-            usb_recv(ptr,sizeof(FW_OTP_IMAGE_T));
-            memcpy(pOTPImage,(unsigned char *)ptr,sizeof(FW_OTP_IMAGE_T));
+            usb_recv(ptr,sizeof(struct FW_OTP_IMAGE));
+            memcpy(pOTPImage,(unsigned char *)ptr,sizeof(struct FW_OTP_IMAGE));
             break;
         }
     }
@@ -3057,7 +2803,7 @@ void UXmodem_MTP()
     }
 
 
-    MTP_Program_Key((UINT8 *)(&pOTPImage->KeyOTP[0]),pOTPImage->KeyLen,pOTPImage->Option,pOTPImage->Mode);
+    MTP_Program_Key((uint8_t *)(&pOTPImage->KeyOTP[0]),pOTPImage->KeyLen,pOTPImage->Option,pOTPImage->Mode);
 
     MSG_DEBUG("\nfinish MTP key download ...\n");
 
@@ -3071,17 +2817,17 @@ void UXmodem_MTP()
 }
 
 typedef struct _info {
-    UINT32  Nand_uPagePerBlock;
-    UINT32  Nand_uPageSize;
-    UINT32  Nand_uSectorPerBlock;
-    UINT32  Nand_uBlockPerFlash;
-    UINT32  Nand_uBadBlockCount;
-    UINT32  Nand_uSpareSize;
-    UINT32  Nand_uIsUserConfig;
-    UINT32  SPI_ID;
-    UINT32  EMMC_uBlock;
-    UINT32  EMMC_uReserved;
-    UINT32  MTP_uNumber;
+    uint32_t  Nand_uPagePerBlock;
+    uint32_t  Nand_uPageSize;
+    uint32_t  Nand_uSectorPerBlock;
+    uint32_t  Nand_uBlockPerFlash;
+    uint32_t  Nand_uBadBlockCount;
+    uint32_t  Nand_uSpareSize;
+    uint32_t  Nand_uIsUserConfig;
+    uint32_t  SPI_ID;
+    uint32_t  EMMC_uBlock;
+    uint32_t  EMMC_uReserved;
+    uint32_t  MTP_uNumber;
 } INFO_T;
 
 
@@ -3089,7 +2835,7 @@ void UXmodem_INFO()
 {
     //int i;
     INFO_T info;
-    UINT8 *ptr=(UINT8 *)&info;
+    uint8_t *ptr=(uint8_t *)&info;
     memset((char *)&info,0x0,sizeof(INFO_T));
 
     MSG_DEBUG("Receive INFO flash Image ...\n");
@@ -3139,10 +2885,10 @@ void UXmodem_INFO()
         info.MTP_uNumber = (inpw(REG_OTP_STATUS) & 0xf<<16)>>16;
     }
 
-    usb_send((UINT8 *)&info, sizeof(INFO_T));
+    usb_send((uint8_t *)&info, sizeof(INFO_T));
     MSG_DEBUG("finish get INFO!!\n");
 }
-INT ParseFlashType()
+int ParseFlashType()
 {
     switch (_usbd_flash_type) {
     case USBD_FLASH_SDRAM: {
@@ -3174,62 +2920,6 @@ INT ParseFlashType()
         UXmodem_INFO();
         _usbd_flash_type = -1;
     }
-#if 0
-    case USBD_FLASH_NOR_RAW: {
-        //UXmodem_NOR_RAW();
-        _usbd_flash_type = -1;
-    }
-    break;
-
-    case USBD_FLASH_NOR: {
-        //UXmodem_NOR();
-        _usbd_flash_type = -1;
-    }
-    break;
-    case USBD_FLASH_MMC_RAW: {
-        //UXmodem_MMC_RAW();
-        _usbd_flash_type = -1;
-    }
-    break;
-    case USBD_FLASH_NAND_RAW: {
-        //UXmodem_NAND_RAW();
-        _usbd_flash_type = -1;
-    }
-    break;
-    case USBD_FLASH_SPI_RAW: {
-        //UXmodem_SPI_RAW();
-        _usbd_flash_type = -1;
-    }
-    break;
-    case USBD_NOR_IMAGE_LIST: {
-        //GetNorImage();
-        _usbd_flash_type = -1;
-    }
-    break;
-
-    case USBD_MMC_IMAGE_LIST: {
-        //GetMMCImage();
-        _usbd_flash_type = -1;
-    }
-    break;
-
-    case USBD_NAND_IMAGE_LIST: {
-        _usbd_flash_type = -1;
-        //GetNandImage();
-    }
-    break;
-    case USBD_SPI_IMAGE_LIST: {
-        //GetSPIImage();
-        _usbd_flash_type = -1;
-    }
-    break;
-    case USBD_NOR_TYPE: {
-        //GetNorType();
-        _usbd_flash_type = -1;
-    }
-    break;
-#endif
-#if 1
     case -1 : { // load xusb.bin again
         if(Bulk_Out_Transfer_Size>0) {
             unsigned char *ptr;
@@ -3250,7 +2940,6 @@ INT ParseFlashType()
         }
     }
     break;
-#endif
     default:
         break;
     }

@@ -7,6 +7,13 @@
 #include "wbfmi.h"
 #include "sd.h"
 
+#define BCH_T15     0x00400000
+#define BCH_T12     0x00200000
+#define BCH_T8      0x00100000
+#define BCH_T4      0x00080000
+#define BCH_T24     0x00040000
+
+
 /*-----------------------------------------------------------------------------
  * Define some constants for BCH
  *---------------------------------------------------------------------------*/
@@ -27,17 +34,32 @@
 #define NAND_EXTRA_2K           64
 #define NAND_EXTRA_4K           128
 #define NAND_EXTRA_8K           376
+
+
+
+/* F/W update information */
+struct FW_UPDATE_INFO
+{
+    uint16_t  imageNo;
+    uint16_t  imageFlag;
+    uint16_t  startBlock;
+    uint16_t  endBlock;
+    uint32_t  executeAddr;
+    uint32_t  blockCount;
+    char    imageName[16];
+};
+
 /*-----------------------------------------------------------------------------*/
 
 // global variables
-UCHAR _fmi_ucBaseAddr1=0, _fmi_ucBaseAddr2=0;
-FMI_SM_INFO_T SMInfo, *pSM;
-FW_UPDATE_INFO_T FWInfo;
+uint8_t _fmi_ucBaseAddr1=0, _fmi_ucBaseAddr2=0;
+struct FMI_SM_INFO SMInfo, *pSM;
+struct FW_UPDATE_INFO FWInfo;
 extern int volatile _usbd_IntraROM;
-extern void SendAck(UINT32 status);
-extern UINT32 g_uIsUserConfig;
+extern void SendAck(uint32_t status);
+extern uint32_t g_uIsUserConfig;
 
-INT fmiSMCheckRB()
+int fmiSMCheckRB()
 {
     int volatile tick;
 
@@ -54,9 +76,9 @@ INT fmiSMCheckRB()
 }
 
 // SM functions
-INT fmiSM_Reset(void)
+int fmiSM_Reset(void)
 {
-    UINT32 volatile i;
+    uint32_t volatile i;
     outpw(REG_SMCMD, 0xff);
     for (i=100; i>0; i--);
     if (!fmiSMCheckRB())
@@ -65,7 +87,7 @@ INT fmiSM_Reset(void)
 }
 
 
-VOID fmiSM_Initial(FMI_SM_INFO_T *pSM)
+void fmiSM_Initial(struct FMI_SM_INFO *pSM)
 {
     outpw(REG_SMCSR,  inpw(REG_SMCSR) | 0x800080);  // enable ECC
 
@@ -94,20 +116,20 @@ VOID fmiSM_Initial(FMI_SM_INFO_T *pSM)
     outpw(REG_NFECR, 0x01);
 }
 
-UINT32 Custom_uBlockPerFlash;
-UINT32 Custom_uPagePerBlock;
-INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
+uint32_t Custom_uBlockPerFlash;
+uint32_t Custom_uPagePerBlock;
+int fmiSM_ReadID(struct FMI_SM_INFO *pSM)
 {
-    UINT32 tempID[5],u32PowerOn,IsID=0;
-    UINT8 name[6][16] = {"T24","T4","T8","T12","T15","XXX"};
-    UINT8 BCHAlgoIdx;
+    uint32_t tempID[5],u32PowerOn,IsID=0;
+    uint8_t name[6][16] = {"T24","T4","T8","T12","T15","XXX"};
+    uint8_t BCHAlgoIdx;
 
-    if (pSM->bIsInResetState == FALSE) {
+    if (pSM->bIsInResetState == false) {
         if (fmiSM_Reset() < 0)
             return Fail;
-        pSM->bIsInResetState = TRUE;
+        pSM->bIsInResetState = true;
     }
-    pSM->bIsInResetState = FALSE;
+    pSM->bIsInResetState = false;
     outpw(REG_SMCMD, 0x90);     // read ID command
     outpw(REG_SMADDR, 0x80000000);  // address 0x00
 
@@ -124,7 +146,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
     pSM->uPagePerBlock = 32;
     pSM->uPageSize = 512;
     pSM->uNandECC = BCH_T4;
-    pSM->bIsMulticycle = TRUE;
+    pSM->bIsMulticycle = true;
     pSM->uSpareSize = 8;
     pSM->uBlockPerFlash  = Custom_uBlockPerFlash-1; // block index with 0-base. = physical blocks - 1
     pSM->uPagePerBlock   = Custom_uPagePerBlock;
@@ -138,7 +160,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
         pSM->uSectorPerBlock = 32;
         pSM->uPageSize = 512;
         pSM->uNandECC = BCH_T4;
-        pSM->bIsMulticycle = TRUE;
+        pSM->bIsMulticycle = true;
         pSM->uSpareSize = 16;
         break;
 
@@ -148,7 +170,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
         pSM->uSectorPerBlock = 32;
         pSM->uPageSize = 512;
         pSM->uNandECC = BCH_T4;
-        pSM->bIsMulticycle = TRUE;
+        pSM->bIsMulticycle = true;
         pSM->uSpareSize = 16;
         break;
 
@@ -158,7 +180,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
         pSM->uSectorPerBlock = 32;
         pSM->uPageSize = 512;
         pSM->uNandECC = BCH_T4;
-        pSM->bIsMulticycle = FALSE;
+        pSM->bIsMulticycle = false;
         pSM->uSpareSize = 16;
         break;
 
@@ -168,7 +190,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
         pSM->uSectorPerBlock = 32;
         pSM->uPageSize = 512;
         pSM->uNandECC = BCH_T4;
-        pSM->bIsMulticycle = FALSE;
+        pSM->bIsMulticycle = false;
         pSM->uSpareSize = 16;
         break;
 
@@ -180,7 +202,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
         pSM->uSectorPerBlock = 256;
         pSM->uPageSize = 2048;
         pSM->uNandECC = BCH_T4;
-        pSM->bIsMulticycle = FALSE;
+        pSM->bIsMulticycle = false;
         pSM->uSpareSize = 64;
         break;
 
@@ -200,7 +222,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
         }
         pSM->uPageSize = 2048;
         pSM->uNandECC = BCH_T4;
-        pSM->bIsMulticycle = TRUE;
+        pSM->bIsMulticycle = true;
         pSM->uSpareSize = 64;
         break;
 
@@ -212,9 +234,9 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
             pSM->uSectorPerBlock = 256;
             pSM->uPageSize = 4096;
             pSM->uNandECC = BCH_T12;
-            pSM->bIsMLCNand = TRUE;
+            pSM->bIsMLCNand = true;
             pSM->uSpareSize = 192;
-            pSM->bIsMulticycle = TRUE;
+            pSM->bIsMulticycle = true;
             break;
         } else if ((tempID[3] & 0x33) == 0x11) {
             pSM->uBlockPerFlash = 4095;
@@ -227,7 +249,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
         }
         pSM->uPageSize = 2048;
         pSM->uNandECC = BCH_T4;
-        pSM->bIsMulticycle = TRUE;
+        pSM->bIsMulticycle = true;
         pSM->uSpareSize = 64;
         break;
 
@@ -268,7 +290,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
             pSM->uNandECC = BCH_T8;
             pSM->uSpareSize = 128;
         }
-        pSM->bIsMulticycle = TRUE;
+        pSM->bIsMulticycle = true;
         break;
 
     case 0xd5:  // 2048M v
@@ -279,7 +301,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
             pSM->uSectorPerBlock = 1024;    /* 128x8 */
             pSM->uPageSize = 4096;
             pSM->uNandECC = BCH_T12;
-            pSM->bIsMulticycle = TRUE;
+            pSM->bIsMulticycle = true;
             pSM->uSpareSize = 224;
             break;
         }
@@ -290,7 +312,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
             pSM->uPageSize = 8192;
             pSM->uSectorPerBlock = pSM->uPageSize / 512 * pSM->uPagePerBlock;
             pSM->uNandECC = BCH_T24;
-            pSM->bIsMulticycle = TRUE;
+            pSM->bIsMulticycle = true;
             pSM->uSpareSize = 448;
             break;
         }
@@ -301,7 +323,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
             pSM->uPageSize = 8192;
             pSM->uSectorPerBlock = pSM->uPageSize / 512 * pSM->uPagePerBlock;
             pSM->uNandECC = BCH_T24;
-            pSM->bIsMulticycle = TRUE;
+            pSM->bIsMulticycle = true;
             pSM->uSpareSize = 376;
             break;
         } else if ((tempID[3] & 0x33) == 0x32) {
@@ -310,7 +332,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
             pSM->uSectorPerBlock = 1024;    /* 128x8 */
             pSM->uPageSize = 4096;
             pSM->uNandECC = BCH_T8;
-            pSM->bIsMLCNand = TRUE;
+            pSM->bIsMLCNand = true;
             pSM->uSpareSize = 128;
         } else if ((tempID[3] & 0x33) == 0x11) {
             pSM->uBlockPerFlash = 16383;
@@ -318,7 +340,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
             pSM->uSectorPerBlock = 256;
             pSM->uPageSize = 2048;
             pSM->uNandECC = BCH_T4;
-            pSM->bIsMLCNand = FALSE;
+            pSM->bIsMLCNand = false;
             pSM->uSpareSize = 64;
         } else if ((tempID[3] & 0x33) == 0x21) {
             pSM->uBlockPerFlash = 8191;
@@ -326,7 +348,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
             pSM->uSectorPerBlock = 512;
             pSM->uPageSize = 2048;
             pSM->uNandECC = BCH_T4;
-            pSM->bIsMLCNand = TRUE;
+            pSM->bIsMLCNand = true;
             pSM->uSpareSize = 64;
         } else if ((tempID[3] & 0x3) == 0x3) {
             pSM->uBlockPerFlash = 8191;//?
@@ -334,10 +356,10 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
             pSM->uSectorPerBlock = 512;//?
             pSM->uPageSize = 8192;
             pSM->uNandECC = BCH_T12;
-            pSM->bIsMLCNand = TRUE;
+            pSM->bIsMLCNand = true;
             pSM->uSpareSize = 368;
         }
-        pSM->bIsMulticycle = TRUE;
+        pSM->bIsMulticycle = true;
         break;
 
     default:
@@ -348,10 +370,10 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
             pSM->uSectorPerBlock = pSM->uPageSize / 512 * pSM->uPagePerBlock;
             pSM->uPageSize       = 4096;
             pSM->uNandECC        = BCH_T24;
-            pSM->bIsMulticycle   = TRUE;
+            pSM->bIsMulticycle   = true;
             //pSM->uSpareSize      = 224;
             pSM->uSpareSize      = 188;
-            pSM->bIsMLCNand      = TRUE;
+            pSM->bIsMLCNand      = true;
             break;
         }
         IsID=1;
@@ -362,9 +384,9 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
     u32PowerOn = inpw(REG_PWRON);
     //if((u32PowerOn&0x3C0)!=0x3C0 ) {
     if ((u32PowerOn & 0xC0) != 0xC0) { /* PageSize PWRON[7:6] */
-        const UINT16 BCH12_SPARE[3] = { 92,184,368};/* 2K, 4K, 8K */
-        const UINT16 BCH15_SPARE[3] = {116,232,464};/* 2K, 4K, 8K */
-        const UINT16 BCH24_SPARE[3] = { 90,180,360};/* 2K, 4K, 8K */
+        const uint16_t BCH12_SPARE[3] = { 92,184,368};/* 2K, 4K, 8K */
+        const uint16_t BCH15_SPARE[3] = {116,232,464};/* 2K, 4K, 8K */
+        const uint16_t BCH24_SPARE[3] = { 90,180,360};/* 2K, 4K, 8K */
         unsigned int volatile gu_fmiSM_PageSize;
         unsigned int volatile g_u32ExtraDataSize;
 
@@ -432,9 +454,9 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
 
         pSM->uPageSize       = gu_fmiSM_PageSize;
         pSM->uSectorPerBlock = pSM->uPageSize / 512 * pSM->uPagePerBlock;
-        //pSM->bIsMulticycle   = TRUE;
+        //pSM->bIsMulticycle   = true;
         pSM->uSpareSize      = g_u32ExtraDataSize;
-        //pSM->bIsMLCNand      = TRUE;
+        //pSM->bIsMLCNand      = true;
         sysprintf("User Configure:\nBlockPerFlash= %d, PagePerBlock= %d\n", pSM->uBlockPerFlash, pSM->uPagePerBlock);
 
     } else {
@@ -482,7 +504,7 @@ INT fmiSM_ReadID(FMI_SM_INFO_T *pSM)
  *  INPUT: ucColAddr = 0 means prepare data from begin of page;
  *                   = <page size> means prepare RA data from begin of spare area.
  *---------------------------------------------------------------------------*/
-INT fmiSM2BufferM_large_page(UINT32 uPage, UINT32 ucColAddr)
+int fmiSM2BufferM_large_page(uint32_t uPage, uint32_t ucColAddr)
 {
     // clear R/B flag
     while(!(inpw(REG_SMISR) & 0x40000));
@@ -508,18 +530,18 @@ INT fmiSM2BufferM_large_page(UINT32 uPage, UINT32 ucColAddr)
 }
 
 
-INT fmiSM_Read_RA(UINT32 uPage, UINT32 ucColAddr)
+int fmiSM_Read_RA(uint32_t uPage, uint32_t ucColAddr)
 {
     return fmiSM2BufferM_large_page(uPage, ucColAddr);
 }
 
-INT fmiCheckInvalidBlockExcept0xF0(FMI_SM_INFO_T *pSM, UINT32 BlockNo)
+int fmiCheckInvalidBlockExcept0xF0(struct FMI_SM_INFO *pSM, uint32_t BlockNo)
 {
     int volatile status=0;
     unsigned int volatile sector;
     unsigned char volatile data512=0xff, data517=0xff, blockStatus=0xff;
 
-    if (pSM->bIsMLCNand == TRUE)
+    if (pSM->bIsMLCNand == true)
         sector = (BlockNo+1) * pSM->uPagePerBlock - 1;
     else
         sector = BlockNo * pSM->uPagePerBlock;
@@ -552,13 +574,13 @@ INT fmiCheckInvalidBlockExcept0xF0(FMI_SM_INFO_T *pSM, UINT32 BlockNo)
     return 0;
 }
 
-INT fmiCheckInvalidBlock(FMI_SM_INFO_T *pSM, UINT32 BlockNo)
+int fmiCheckInvalidBlock(struct FMI_SM_INFO *pSM, uint32_t BlockNo)
 {
     int volatile status=0;
     unsigned int volatile sector;
     unsigned char volatile data512=0xff, data517=0xff, blockStatus=0xff;
 
-    if (pSM->bIsMLCNand == TRUE)
+    if (pSM->bIsMLCNand == true)
         sector = (BlockNo+1) * pSM->uPagePerBlock - 1;
     else
         sector = BlockNo * pSM->uPagePerBlock;
@@ -591,9 +613,9 @@ INT fmiCheckInvalidBlock(FMI_SM_INFO_T *pSM, UINT32 BlockNo)
 }
 
 
-INT fmiSM_BlockErase(FMI_SM_INFO_T *pSM, UINT32 uBlock)
+int fmiSM_BlockErase(struct FMI_SM_INFO *pSM, uint32_t uBlock)
 {
-    UINT32 page_no;
+    uint32_t page_no;
 
 #ifndef ERASE_WITH_0XF0
     if (fmiCheckInvalidBlock(pSM, uBlock) != 1)
@@ -643,9 +665,9 @@ INT fmiSM_BlockErase(FMI_SM_INFO_T *pSM, UINT32 uBlock)
     return Successful;
 }
 
-INT fmiSM_BlockEraseBad(FMI_SM_INFO_T *pSM, UINT32 uBlock)
+int fmiSM_BlockEraseBad(struct FMI_SM_INFO *pSM, uint32_t uBlock)
 {
-    UINT32 page_no;
+    uint32_t page_no;
 
     page_no = uBlock * pSM->uPagePerBlock;      // get page address
 
@@ -678,12 +700,12 @@ INT fmiSM_BlockEraseBad(FMI_SM_INFO_T *pSM, UINT32 uBlock)
 }
 
 
-INT fmiMarkBadBlock(FMI_SM_INFO_T *pSM, UINT32 BlockNo)
+int fmiMarkBadBlock(struct FMI_SM_INFO *pSM, uint32_t BlockNo)
 {
-    UINT32 uSector, ucColAddr;
+    uint32_t uSector, ucColAddr;
 
     /* check if MLC NAND */
-    if (pSM->bIsMLCNand == TRUE) {
+    if (pSM->bIsMLCNand == true) {
         uSector = (BlockNo+1) * pSM->uPagePerBlock - 1; // write last page
         ucColAddr = pSM->uPageSize;
 
@@ -764,7 +786,7 @@ _mark_512:
     }
 }
 
-INT fmiSM_Erase(UINT32 uChipSel,UINT32 start, UINT32 len)
+int fmiSM_Erase(uint32_t uChipSel,uint32_t start, uint32_t len)
 {
     int i, status;
     int volatile badBlock=0;
@@ -791,7 +813,7 @@ INT fmiSM_Erase(UINT32 uChipSel,UINT32 start, UINT32 len)
     return badBlock;
 }
 
-INT fmiSM_EraseBad(UINT32 uChipSel,UINT32 start, UINT32 len)
+int fmiSM_EraseBad(uint32_t uChipSel,uint32_t start, uint32_t len)
 {
     int i, status;
     int volatile badBlock=0;
@@ -810,7 +832,7 @@ INT fmiSM_EraseBad(UINT32 uChipSel,UINT32 start, UINT32 len)
 }
 
 //-----------------------------------------------------
-INT fmiSM_ChipErase(UINT32 uChipSel)
+int fmiSM_ChipErase(uint32_t uChipSel)
 {
     int i, status;
     int volatile badBlock=0;
@@ -851,7 +873,7 @@ INT fmiSM_ChipErase(UINT32 uChipSel)
     return badBlock;
 }
 
-INT fmiSM_ChipEraseBad(UINT32 uChipSel)
+int fmiSM_ChipEraseBad(uint32_t uChipSel)
 {
     int i, status;
     int volatile badBlock=0;
@@ -872,7 +894,7 @@ INT fmiSM_ChipEraseBad(UINT32 uChipSel)
 /*-----------------------------------------------------------------------------
  * Really write data and parity code to 2K/4K/8K page size NAND flash by NAND commands.
  *---------------------------------------------------------------------------*/
-INT fmiSM_Write_large_page_oob(UINT32 uSector, UINT32 ucColAddr, UINT32 uSAddr,UINT32 oobsize)
+int fmiSM_Write_large_page_oob(uint32_t uSector, uint32_t ucColAddr, uint32_t uSAddr,uint32_t oobsize)
 {
     int k;
     outpw(REG_NAND_DMACSAR, uSAddr);// set DMA transfer starting address
@@ -930,9 +952,9 @@ INT fmiSM_Write_large_page_oob(UINT32 uSector, UINT32 ucColAddr, UINT32 uSAddr,U
     return 0;
 }
 
-INT fmiSM_Write_large_page_oob2(UINT32 uSector, UINT32 ucColAddr, UINT32 uSAddr)
+int fmiSM_Write_large_page_oob2(uint32_t uSector, uint32_t ucColAddr, uint32_t uSAddr)
 {
-    UINT32 readlen,i;
+    uint32_t readlen,i;
 
     readlen=pSM->uPageSize+pSM->uSpareSize;
     outpw(REG_SMCMD,  0x80);  // serial data input command
@@ -955,7 +977,7 @@ INT fmiSM_Write_large_page_oob2(UINT32 uSector, UINT32 ucColAddr, UINT32 uSAddr)
     return 0;
 }
 
-INT fmiSM_Write_large_page(UINT32 uSector, UINT32 ucColAddr, UINT32 uSAddr)
+int fmiSM_Write_large_page(uint32_t uSector, uint32_t ucColAddr, uint32_t uSAddr)
 {
     outpw(REG_NAND_DMACSAR, uSAddr);    // set DMA transfer starting address
 
@@ -1014,15 +1036,15 @@ INT fmiSM_Write_large_page(UINT32 uSector, UINT32 ucColAddr, UINT32 uSAddr)
 }
 
 
-static void fmiSM_CorrectData_BCH(UINT8 ucFieidIndex, UINT8 ucErrorCnt, UINT8* pDAddr)
+static void fmiSM_CorrectData_BCH(uint8_t ucFieidIndex, uint8_t ucErrorCnt, uint8_t* pDAddr)
 {
-    UINT32 uaData[24], uaAddr[24];
-    UINT32 uaErrorData[4];
-    UINT8  ii, jj;
-    UINT32 uPageSize;
-    UINT32 field_len, padding_len, parity_len;
-    UINT32 total_field_num;
-    UINT8  *smra_index;
+    uint32_t uaData[24], uaAddr[24];
+    uint32_t uaErrorData[4];
+    uint8_t  ii, jj;
+    uint32_t uPageSize;
+    uint32_t field_len, padding_len, parity_len;
+    uint32_t total_field_num;
+    uint8_t  *smra_index;
 
     //--- assign some parameters for different BCH and page size
     switch (inpw(REG_SMCSR) & 0x7c0000) {
@@ -1052,7 +1074,7 @@ static void fmiSM_CorrectData_BCH(UINT8 ucFieidIndex, UINT8 ucErrorCnt, UINT8* p
         parity_len  = BCH_PARITY_LEN_T4;
         break;
     default:
-        sysprintf("ERROR: fmiSM_CorrectData_BCH(): invalid SMCR_BCH_TSEL = 0x%08X\n", (UINT32)(inpw(REG_SMCSR) & 0x7c0000));
+        sysprintf("ERROR: fmiSM_CorrectData_BCH(): invalid SMCR_BCH_TSEL = 0x%08X\n", (uint32_t)(inpw(REG_SMCSR) & 0x7c0000));
         return;
     }
 
@@ -1125,11 +1147,11 @@ static void fmiSM_CorrectData_BCH(UINT8 ucFieidIndex, UINT8 ucErrorCnt, UINT8* p
             uaAddr[ii] += (parity_len*(ucFieidIndex-1));    // field offset
 
             sysprintf("BCH error corrected for 3 bytes: address 0x%08X, data [0x%02X] --> ",
-                      (UINT8 *)REG_SMRA0+uaAddr[ii], *((UINT8 *)REG_SMRA0+uaAddr[ii]));
+                      (uint8_t *)REG_SMRA0+uaAddr[ii], *((uint8_t *)REG_SMRA0+uaAddr[ii]));
 
-            *((UINT8 *)REG_SMRA0+uaAddr[ii]) ^= uaData[ii];
+            *((uint8_t *)REG_SMRA0+uaAddr[ii]) ^= uaData[ii];
 
-            sysprintf("[0x%02X]\n", *((UINT8 *)REG_SMRA0+uaAddr[ii]));
+            sysprintf("[0x%02X]\n", *((uint8_t *)REG_SMRA0+uaAddr[ii]));
         }
         // for wrong parity code in redundancy area
         else {
@@ -1142,7 +1164,7 @@ static void fmiSM_CorrectData_BCH(UINT8 ucFieidIndex, UINT8 ucErrorCnt, UINT8* p
             uaAddr[ii] = uaAddr[ii] - (field_len + padding_len - parity_len);
 
             // smra_index point to the first parity code of first field in register SMRA0~n
-            smra_index = (UINT8 *)
+            smra_index = (uint8_t *)
                          (REG_SMRA0 + (inpw(REG_SMREACTL) & 0x1ff) - // bottom of all parity code -
                           (parity_len * total_field_num)             // byte count of all parity code
                          );
@@ -1152,20 +1174,20 @@ static void fmiSM_CorrectData_BCH(UINT8 ucFieidIndex, UINT8 ucErrorCnt, UINT8* p
             //                 offset within field
             sysprintf("BCH error corrected for parity: address 0x%08X, data [0x%02X] --> ",
                       smra_index + (parity_len * (ucFieidIndex-1)) + uaAddr[ii],
-                      *((UINT8 *)smra_index + (parity_len * (ucFieidIndex-1)) + uaAddr[ii]));
-            *((UINT8 *)smra_index + (parity_len * (ucFieidIndex-1)) + uaAddr[ii]) ^= uaData[ii];
-            sysprintf("[0x%02X]\n", *((UINT8 *)smra_index + (parity_len * (ucFieidIndex-1)) + uaAddr[ii]));
+                      *((uint8_t *)smra_index + (parity_len * (ucFieidIndex-1)) + uaAddr[ii]));
+            *((uint8_t *)smra_index + (parity_len * (ucFieidIndex-1)) + uaAddr[ii]) ^= uaData[ii];
+            sysprintf("[0x%02X]\n", *((uint8_t *)smra_index + (parity_len * (ucFieidIndex-1)) + uaAddr[ii]));
         }
     }   // end of for (ii<ucErrorCnt)
 }
 
 
-INT fmiSM_Read_move_data_ecc_check(UINT32 uDAddr)
+int fmiSM_Read_move_data_ecc_check(uint32_t uDAddr)
 {
-    UINT32 uStatus;
-    UINT32 uErrorCnt, ii, jj;
-    volatile UINT32 uError = 0;
-    UINT32 uLoop;
+    uint32_t uStatus;
+    uint32_t uErrorCnt, ii, jj;
+    volatile uint32_t uError = 0;
+    uint32_t uLoop;
 
     //--- uLoop is the number of SM_ECC_STx should be check.
     //      One SM_ECC_STx include ECC status for 4 fields.
@@ -1220,7 +1242,7 @@ INT fmiSM_Read_move_data_ecc_check(UINT32 uDAddr)
                     if ((uStatus & 0x3)==0x01) { // correctable error in field (jj*4+ii)
                         // 2011/8/17 by CJChen1@nuvoton.com, mask uErrorCnt since Fx_ECNT just has 5 valid bits
                         uErrorCnt = (uStatus >> 2) & 0x1F;
-                        fmiSM_CorrectData_BCH(jj*4+ii, uErrorCnt, (UINT8*)uDAddr);
+                        fmiSM_CorrectData_BCH(jj*4+ii, uErrorCnt, (uint8_t*)uDAddr);
                         sysprintf("Warning: Field %d have %d BCH error. Corrected!!\n", jj*4+ii, uErrorCnt);
                         break;
                     } else if (((uStatus & 0x3)==0x02) ||
@@ -1248,9 +1270,9 @@ INT fmiSM_Read_move_data_ecc_check(UINT32 uDAddr)
 }
 
 
-INT fmiSM_Read_large_page(FMI_SM_INFO_T *pSM, UINT32 uPage, UINT32 uDAddr)
+int fmiSM_Read_large_page(struct FMI_SM_INFO *pSM, uint32_t uPage, uint32_t uDAddr)
 {
-    INT result;
+    int result;
 
     result = fmiSM2BufferM_large_page(uPage, 0);
     if (result != 0)
@@ -1263,10 +1285,10 @@ INT fmiSM_Read_large_page(FMI_SM_INFO_T *pSM, UINT32 uPage, UINT32 uDAddr)
 }
 
 
-BOOL volatile _usbd_bIsFMIInit = FALSE;
-INT fmiHWInit(void)
+bool volatile _usbd_bIsFMIInit = false;
+int fmiHWInit(void)
 {
-    if (_usbd_bIsFMIInit == FALSE) {
+    if (_usbd_bIsFMIInit == false) {
         // Enable SD Card Host Controller operation and driving clock.
         outpw(REG_HCLKEN, (inpw(REG_HCLKEN) | 0x700000)); /* enable FMI, NAND, SD clock */
 
@@ -1277,12 +1299,12 @@ INT fmiHWInit(void)
         outpw(REG_NAND_FMICSR, FMI_CSR_SWRST);      // reset FMI engine
         while(inpw(REG_NAND_FMICSR) & FMI_CSR_SWRST);
 
-        _usbd_bIsFMIInit = TRUE;
+        _usbd_bIsFMIInit = true;
     }
     return 0;
 } /* end fmiHWInit */
 
-INT fmiNandInit(void)
+int fmiNandInit(void)
 {
     /* select NAND function pins */
     if (inpw(REG_PWRON) & 0x08000000) {
@@ -1305,7 +1327,7 @@ INT fmiNandInit(void)
     outpw(REG_SMCSR, inpw(REG_SMCSR) |  0x100); //protect RA 3 byte
     outpw(REG_SMCSR, inpw(REG_SMCSR) | 0x10);
 
-    memset((char *)&SMInfo, 0, sizeof(FMI_SM_INFO_T));
+    memset((char *)&SMInfo, 0, sizeof(struct FMI_SM_INFO));
     pSM = &SMInfo;
     if (fmiSM_ReadID(pSM) < 0)
         return Fail;

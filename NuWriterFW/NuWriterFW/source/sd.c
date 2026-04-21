@@ -24,13 +24,13 @@
 // For response R3 (such as ACMD41, CRC-7 is invalid; but SD controller will still
 //      calculate CRC-7 and get an error result, software should ignore this error and clear SDISR [CRC_IF] flag
 //      _sdio_uR3_CMD is the flag for it. 1 means software should ignore CRC-7 error
-UINT32 _sd_uR3_CMD=0;
-UINT32 _sd_uR7_CMD=0;
+uint32_t _sd_uR3_CMD=0;
+uint32_t _sd_uR7_CMD=0;
 
-UINT8 *_sd_pSDHCBuffer;
-UINT32 _sd_ReferenceClock;
+uint8_t *_sd_pSDHCBuffer;
+uint32_t _sd_ReferenceClock;
 
-__align(4096) UINT8 _sd_ucSDHCBuffer[64];
+__align(4096) uint8_t _sd_ucSDHCBuffer[64];
 
 void SD_CheckRB()
 {
@@ -44,7 +44,7 @@ void SD_CheckRB()
 }
 
 
-int SD_SDCommand(FMI_SD_INFO_T *pSD, UINT8 ucCmd, UINT32 uArg)
+int SD_SDCommand(struct FMI_SD_INFO *pSD, uint8_t ucCmd, uint32_t uArg)
 {
     outpw(REG_NAND_SDARG, uArg);
     outpw(REG_NAND_SDCSR, (inpw(REG_NAND_SDCSR)&(~SD_CSR_CMD_MASK))|(ucCmd << 8)|(SD_CSR_CO_EN));
@@ -54,7 +54,7 @@ int SD_SDCommand(FMI_SD_INFO_T *pSD, UINT8 ucCmd, UINT32 uArg)
 }
 
 
-int SD_SDCmdAndRsp(FMI_SD_INFO_T *pSD, UINT8 ucCmd, UINT32 uArg, int ntickCount)
+int SD_SDCmdAndRsp(struct FMI_SD_INFO *pSD, uint8_t ucCmd, uint32_t uArg, int ntickCount)
 {
     outpw(REG_NAND_SDARG, uArg);
     outpw(REG_NAND_SDCSR, (inpw(REG_NAND_SDCSR)&(~SD_CSR_CMD_MASK))|(ucCmd << 8)|(SD_CSR_CO_EN | SD_CSR_RI_EN));
@@ -101,7 +101,6 @@ int SD_SDCmdAndRsp(FMI_SD_INFO_T *pSD, UINT8 ucCmd, UINT32 uArg, int ntickCount)
 
 int SD_Swap32(int val)
 {
-#if 1
     int buf;
 
     buf = val;
@@ -110,14 +109,10 @@ int SD_Swap32(int val)
     val |= (buf>>8)&0xff00;
     val |= (buf>>24)&0xff;
     return val;
-
-#else
-    return ((val<<24) | ((val<<8)&0xff0000) | ((val>>8)&0xff00) | (val>>24));
-#endif
 }
 
 // Get 16 bytes CID or CSD
-int SD_SDCmdAndRsp2(FMI_SD_INFO_T *pSD, UINT8 ucCmd, UINT32 uArg, UINT32 *puR2ptr)
+int SD_SDCmdAndRsp2(struct FMI_SD_INFO *pSD, uint8_t ucCmd, uint32_t uArg, uint32_t *puR2ptr)
 {
     unsigned int i;
     unsigned int tmpBuf[5];
@@ -141,7 +136,7 @@ int SD_SDCmdAndRsp2(FMI_SD_INFO_T *pSD, UINT8 ucCmd, UINT32 uArg, UINT32 *puR2pt
 }
 
 
-int SD_SDCmdAndRspDataIn(FMI_SD_INFO_T *pSD, UINT8 ucCmd, UINT32 uArg)
+int SD_SDCmdAndRspDataIn(struct FMI_SD_INFO *pSD, uint8_t ucCmd, uint32_t uArg)
 {
     volatile int buf;
 
@@ -174,9 +169,9 @@ int SD_SDCmdAndRspDataIn(FMI_SD_INFO_T *pSD, UINT8 ucCmd, UINT32 uArg)
 // there are 8 bits for divider N1, maximum is 256
 #define SD_CLK_DIV1_MAX     256
 
-void SD_Set_clock(UINT32 sd_clock_khz)
+void SD_Set_clock(uint32_t sd_clock_khz)
 {
-    UINT32 rate, div0, div1, i;
+    uint32_t rate, div0, div1, i;
 
     rate = _sd_ReferenceClock / sd_clock_khz;
 
@@ -214,7 +209,7 @@ void SD_Set_clock(UINT32 sd_clock_khz)
 }
 
 // Initial
-int SD_Init(FMI_SD_INFO_T *pSD)
+int SD_Init(struct FMI_SD_INFO *pSD)
 {
     int volatile i, status;
     unsigned int resp;
@@ -356,12 +351,12 @@ int SD_Init(FMI_SD_INFO_T *pSD)
 }
 
 
-int SD_SwitchToHighSpeed(FMI_SD_INFO_T *pSD)
+int SD_SwitchToHighSpeed(struct FMI_SD_INFO *pSD)
 {
     int volatile status=0;
-    UINT16 current_comsumption, busy_status0;
+    uint16_t current_comsumption, busy_status0;
 
-    outpw(REG_NAND_DMACSAR, (UINT32)_sd_pSDHCBuffer);   // set DMA transfer starting address
+    outpw(REG_NAND_DMACSAR, (uint32_t)_sd_pSDHCBuffer);   // set DMA transfer starting address
     outpw(REG_NAND_SDBLEN, 63); // 512 bit
 
     if ((status = SD_SDCmdAndRspDataIn(pSD, 6, 0x00ffff01)) != Successful)
@@ -374,7 +369,7 @@ int SD_SwitchToHighSpeed(FMI_SD_INFO_T *pSD)
     busy_status0 = _sd_pSDHCBuffer[28]<<8 | _sd_pSDHCBuffer[29];
 
     if (!busy_status0) { // function ready
-        outpw(REG_NAND_DMACSAR, (UINT32)_sd_pSDHCBuffer);   // set DMA transfer starting address
+        outpw(REG_NAND_DMACSAR, (uint32_t)_sd_pSDHCBuffer);   // set DMA transfer starting address
         outpw(REG_NAND_SDBLEN, 63); // 512 bit
 
         if ((status = SD_SDCmdAndRspDataIn(pSD, 6, 0x80ffff01)) != Successful)
@@ -395,7 +390,7 @@ int SD_SwitchToHighSpeed(FMI_SD_INFO_T *pSD)
 }
 
 
-int SD_SelectCardType(FMI_SD_INFO_T *pSD)
+int SD_SelectCardType(struct FMI_SD_INFO *pSD)
 {
     int volatile status=0;
 
@@ -407,8 +402,8 @@ int SD_SelectCardType(FMI_SD_INFO_T *pSD)
     // if SD card set 4bit
     if (pSD->uCardType == SD_TYPE_SD_HIGH)
     {
-        _sd_pSDHCBuffer = (UINT8 *)((UINT32)_sd_ucSDHCBuffer);
-        outpw(REG_NAND_DMACSAR, (UINT32)_sd_pSDHCBuffer);   // set DMA transfer starting address
+        _sd_pSDHCBuffer = (uint8_t *)((uint32_t)_sd_ucSDHCBuffer);
+        outpw(REG_NAND_DMACSAR, (uint32_t)_sd_pSDHCBuffer);   // set DMA transfer starting address
         outpw(REG_NAND_SDBLEN, 7);  // 64 bit
 
         if ((status = SD_SDCmdAndRsp(pSD, 55, pSD->uRCA, 0)) != Successful)
@@ -435,8 +430,8 @@ int SD_SelectCardType(FMI_SD_INFO_T *pSD)
     }
     else if (pSD->uCardType == SD_TYPE_SD_LOW)
     {
-        _sd_pSDHCBuffer = (UINT8 *)((UINT32)_sd_ucSDHCBuffer);
-        outpw(REG_NAND_DMACSAR, (UINT32)_sd_pSDHCBuffer);   // set DMA transfer starting address
+        _sd_pSDHCBuffer = (uint8_t *)((uint32_t)_sd_ucSDHCBuffer);
+        outpw(REG_NAND_DMACSAR, (uint32_t)_sd_pSDHCBuffer);   // set DMA transfer starting address
         outpw(REG_NAND_SDBLEN, 7);  // 64 bit
 
         if ((status = SD_SDCmdAndRsp(pSD, 55, pSD->uRCA, 0)) != Successful)
@@ -472,9 +467,9 @@ int SD_SelectCardType(FMI_SD_INFO_T *pSD)
 /*-----------------------------------------------------------------------------
  * sdioSD_Read_in_blksize(), To read data with black size "blksize"
  *---------------------------------------------------------------------------*/
-int SD_Read_in_blksize(FMI_SD_INFO_T *pSD, UINT32 uSector, UINT32 uBufcnt, UINT32 uDAddr, UINT32 blksize)
+int SD_Read_in_blksize(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufcnt, uint32_t uDAddr, uint32_t blksize)
 {
-    char volatile bIsSendCmd=FALSE, buf;
+    char volatile bIsSendCmd=false, buf;
     unsigned int volatile reg;
     int volatile i, loop, status;
 
@@ -496,10 +491,10 @@ int SD_Read_in_blksize(FMI_SD_INFO_T *pSD, UINT32 uSector, UINT32 uBufcnt, UINT3
     for (i=0; i<loop; i++)
     {
         reg = (inpw(REG_NAND_SDCSR) & ~SD_CSR_CMD_MASK) | 0xff0000;
-        if (bIsSendCmd == FALSE)
+        if (bIsSendCmd == false)
         {
             outpw(REG_NAND_SDCSR, reg|(18<<8)|(SD_CSR_CO_EN | SD_CSR_RI_EN | SD_CSR_DI_EN));
-            bIsSendCmd = TRUE;
+            bIsSendCmd = true;
         }
         else
             outpw(REG_NAND_SDCSR, reg | SD_CSR_DI_EN);
@@ -531,10 +526,10 @@ int SD_Read_in_blksize(FMI_SD_INFO_T *pSD, UINT32 uSector, UINT32 uBufcnt, UINT3
         reg = reg & (~SD_CSR_BLK_CNT_MASK);
         reg |= (loop << 16);    // setup SDCR_BLKCNT
 
-        if (bIsSendCmd == FALSE)
+        if (bIsSendCmd == false)
         {
             outpw(REG_NAND_SDCSR, reg|(18<<8)|(SD_CSR_CO_EN | SD_CSR_RI_EN | SD_CSR_DI_EN));
-            bIsSendCmd = TRUE;
+            bIsSendCmd = true;
         }
         else
             outpw(REG_NAND_SDCSR, reg | SD_CSR_DI_EN);
@@ -573,7 +568,7 @@ int SD_Read_in_blksize(FMI_SD_INFO_T *pSD, UINT32 uSector, UINT32 uBufcnt, UINT3
 /*-----------------------------------------------------------------------------
  * sdioSD_Read_in(), To read data with default black size SD_BLOCK_SIZE
  *---------------------------------------------------------------------------*/
-int SD_Read_in(FMI_SD_INFO_T *pSD, UINT32 uSector, UINT32 uBufcnt, UINT32 uDAddr)
+int SD_Read_in(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufcnt, uint32_t uDAddr)
 {
     return SD_Read_in_blksize(pSD, uSector, uBufcnt, uDAddr, SD_BLOCK_SIZE);
 }
@@ -581,9 +576,9 @@ int SD_Read_in(FMI_SD_INFO_T *pSD, UINT32 uSector, UINT32 uBufcnt, UINT32 uDAddr
 /*-----------------------------------------------------------------------------
  * sdioSD_Write_in(), To write data with static black size SD_BLOCK_SIZE
  *---------------------------------------------------------------------------*/
-int SD_Write_in(FMI_SD_INFO_T *pSD, UINT32 uSector, UINT32 uBufcnt, UINT32 uSAddr)
+int SD_Write_in(struct FMI_SD_INFO *pSD, uint32_t uSector, uint32_t uBufcnt, uint32_t uSAddr)
 {
-    char volatile bIsSendCmd = FALSE;
+    char volatile bIsSendCmd = false;
     unsigned int volatile reg;
     int volatile i, loop, status;
 
@@ -616,7 +611,7 @@ int SD_Write_in(FMI_SD_INFO_T *pSD, UINT32 uSector, UINT32 uBufcnt, UINT32 uSAdd
         if (!bIsSendCmd)
         {
             outpw(REG_NAND_SDCSR, reg|(25<<8)|(SD_CSR_CO_EN | SD_CSR_RI_EN | SD_CSR_DO_EN));
-            bIsSendCmd = TRUE;
+            bIsSendCmd = true;
         }
         else
             outpw(REG_NAND_SDCSR, reg | SD_CSR_DO_EN);
@@ -643,7 +638,7 @@ int SD_Write_in(FMI_SD_INFO_T *pSD, UINT32 uSector, UINT32 uBufcnt, UINT32 uSAdd
         if (!bIsSendCmd)
         {
             outpw(REG_NAND_SDCSR, reg|(25<<8)|(SD_CSR_CO_EN | SD_CSR_RI_EN | SD_CSR_DO_EN));
-            bIsSendCmd = TRUE;
+            bIsSendCmd = true;
         }
         else
             outpw(REG_NAND_SDCSR, reg | SD_CSR_DO_EN);
@@ -677,7 +672,7 @@ int SD_Write_in(FMI_SD_INFO_T *pSD, UINT32 uSector, UINT32 uBufcnt, UINT32 uSAdd
 }
 
 
-void SD_Get_SD_info(FMI_SD_INFO_T *pSD, DISK_DATA_T *_info)
+void SD_Get_SD_info(struct FMI_SD_INFO *pSD, struct DISK_DATA *_info)
 {
     unsigned int i;
     unsigned int R_LEN, C_Size, MULT, size;
@@ -718,13 +713,13 @@ void SD_Get_SD_info(FMI_SD_INFO_T *pSD, DISK_DATA_T *_info)
         _info->serial[i] = *ptr++;
 }
 
-void SD_SetReferenceClock(UINT32 uClock)
+void SD_SetReferenceClock(uint32_t uClock)
 {
     _sd_ReferenceClock = uClock;    // kHz
 }
 
 
-int SD_ChipErase(FMI_SD_INFO_T *pSD, DISK_DATA_T *_info)
+int SD_ChipErase(struct FMI_SD_INFO *pSD, struct DISK_DATA *_info)
 {
     int status=0;
 
