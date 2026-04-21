@@ -9,23 +9,19 @@
 
   <project>
     <PathAndName>.\NuWriterFW_16MB.uvproj</PathAndName>
-    <NodeIsExpanded>1</NodeIsExpanded>
   </project>
 
   <project>
     <PathAndName>.\NuWriterFW_32MB.uvproj</PathAndName>
-    <NodeIsExpanded>1</NodeIsExpanded>
   </project>
 
   <project>
     <PathAndName>.\NuWriterFW_64MB.uvproj</PathAndName>
-    <NodeIsExpanded>1</NodeIsExpanded>
   </project>
 
   <project>
     <PathAndName>.\NuWriterFW_128MB.uvproj</PathAndName>
     <NodeIsActive>1</NodeIsActive>
-    <NodeIsExpanded>1</NodeIsExpanded>
   </project>
 
 </ProjectWorkspace>

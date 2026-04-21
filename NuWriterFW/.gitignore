@@ -1,0 +1,6 @@
+obj/
+*.dep
+*.lst
+*.uvgui.*
+*.uvopt
+*.bak
